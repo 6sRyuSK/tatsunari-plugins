@@ -12,10 +12,11 @@ See `CLAUDE.md` for the conventions every change must follow.
 _None yet._
 
 
-### In progress (1)
+### In progress (2)
 
 | Plugin | Category | Reference |
 | --- | --- | --- |
+| Saturator | Saturation | Analog tape / tube soft-clip |
 | Single-Band EQ | EQ | RBJ Audio EQ Cookbook — peaking EQ |
 
 
