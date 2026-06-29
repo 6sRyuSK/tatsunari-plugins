@@ -22,13 +22,9 @@ _None yet._
 | Single-Band EQ | EQ | RBJ Audio EQ Cookbook — peaking EQ |
 
 
-### Planned (3)
+### Planned (0)
 
-| Plugin | Category | Reference |
-| --- | --- | --- |
-| Bus Compressor | Dynamics | SSL G-series bus comp |
-| Dynamic Parametric EQ | EQ | FabFilter Pro-Q 4 |
-| Saturator | Saturation | Analog tape / tube soft-clip |
+_None yet._
 
 <!-- END:CATALOG -->
 
