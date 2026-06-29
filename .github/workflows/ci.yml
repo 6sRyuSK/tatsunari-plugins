@@ -64,13 +64,12 @@ jobs:
           curl -sL https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Linux.zip -o pluginval.zip
           unzip -o pluginval.zip
           chmod +x pluginval
-          shopt -s globstar nullglob
           status=0
-          for p in build/**/VST3/*.vst3; do
+          while IFS= read -r p; do
             echo "::group::pluginval $p"
             xvfb-run -a ./pluginval --strictness-level "$PLUGINVAL_STRICTNESS" --skip-gui-tests --validate-in-process --validate "$p" || status=1
             echo "::endgroup::"
-          done
+          done < <(find build -type d -path '*/VST3/*.vst3')
           [ "$status" -eq 0 ]
 
       - name: Validate plugins (macOS)
@@ -81,19 +80,18 @@ jobs:
           unzip -o pluginval.zip
           xattr -cr pluginval.app || true
           PV="pluginval.app/Contents/MacOS/pluginval"
-          shopt -s globstar nullglob
           # AU plugins must live in a registered location to load.
           mkdir -p "$HOME/Library/Audio/Plug-Ins/Components"
-          for c in build/**/AU/*.component; do
+          while IFS= read -r c; do
             cp -R "$c" "$HOME/Library/Audio/Plug-Ins/Components/"
-          done
+          done < <(find build -type d -path '*/AU/*.component')
           killall -9 AudioComponentRegistrar 2>/dev/null || true
           status=0
-          for p in build/**/VST3/*.vst3 build/**/AU/*.component; do
+          while IFS= read -r p; do
             echo "::group::pluginval $p"
             "$PV" --strictness-level "$PLUGINVAL_STRICTNESS" --skip-gui-tests --validate-in-process --validate "$p" || status=1
             echo "::endgroup::"
-          done
+          done < <(find build \( -type d -path '*/VST3/*.vst3' -o -type d -path '*/AU/*.component' \))
           [ "$status" -eq 0 ]
 
       # pluginval.exe is a GUI-subsystem binary; Start-Process -Wait -PassThru
