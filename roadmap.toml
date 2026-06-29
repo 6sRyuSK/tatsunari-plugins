@@ -1,0 +1,6 @@
+# Planned plugins not yet started. One [[plugin]] block each. Example:
+#
+# [[plugin]]
+# name      = "Bus Compressor"
+# category  = "Dynamics"
+# reference = "SSL G-series bus comp"
