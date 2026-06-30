@@ -48,18 +48,9 @@ add_executable(resonance_suppressor_dsp_test tests/dsp_test.cpp)
 target_link_libraries(resonance_suppressor_dsp_test PRIVATE factory_core)
 target_compile_features(resonance_suppressor_dsp_test PRIVATE cxx_std_20)
 
-# Full DSP suite, including 192 kHz (regression coverage for the analyser /
-# detector resolution at high sample rates — see tests/dsp_test.cpp).
-foreach(_fs 44100 48000 96000 192000)
+# Full standard sample-rate matrix, up to 192 kHz (regression coverage for the
+# analyser / detector resolution at high sample rates — see tests/dsp_test.cpp).
+foreach(_fs 44100 48000 88200 96000 176400 192000)
   add_test(NAME resonance_suppressor_dsp_${_fs}
            COMMAND resonance_suppressor_dsp_test ${_fs})
-endforeach()
-
-# The resolution invariants (the guard against a fixed FFT order degrading at
-# high rates) additionally gate the 44.1k-family high rates. The heavier
-# suppression-selectivity gate at 88.2 / 176.4 kHz awaits a tolerance review
-# (the control-band check is noise-realisation sensitive there).
-foreach(_fs 88200 176400)
-  add_test(NAME resonance_suppressor_resolution_${_fs}
-           COMMAND resonance_suppressor_dsp_test --resolution-only ${_fs})
 endforeach()

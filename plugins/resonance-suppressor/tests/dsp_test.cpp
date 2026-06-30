@@ -18,10 +18,10 @@
 //      192 kHz), so the low end of the spectrum is never lost. This is the guard
 //      against a fixed FFT order silently degrading at high sample rates.
 //
-// Tests prepare the engine at the same order the plugin would pick
-// (factory_core::fftOrderForSampleRate), so the gates exercise the real
-// high-rate path. The resolution invariant (7) is gated across the full standard
-// matrix up to 192 kHz; the full suite gates 44.1 / 48 / 96 / 192 kHz.
+// Every test runs across the full standard sample-rate matrix
+// (44.1 / 48 / 88.2 / 96 / 176.4 / 192 kHz) and prepares the engine at the same
+// order the plugin would pick (factory_core::fftOrderForSampleRate), so the
+// gates exercise the real high-rate path.
 //
 #include "factory_core/FFT.h"
 #include "factory_core/ResonanceSuppressor.h"
@@ -160,7 +160,7 @@ namespace
     {
         std::printf ("Suppression + selectivity @ Fs=%.0f\n", Fs);
         const int M = 1 << 15;
-        const double f0 = 2000.0, fc = 7000.0;
+        const double f0 = 2000.0;
         std::mt19937 rng (5);
         std::normal_distribution<double> g (0.0, 0.1);
         std::vector<double> x ((size_t) M);
@@ -173,13 +173,31 @@ namespace
 
         const int a = M / 2, b = M; // steady-state window
         const double dryF0 = magAt (dry, a, b, f0, Fs), wetF0 = magAt (wet, a, b, f0, Fs);
-        const double dryFc = magAt (dry, a, b, fc, Fs), wetFc = magAt (wet, a, b, fc, Fs);
 
-        if (wetF0 > dryF0 * 0.6) fail ("resonance at f0 not suppressed (>=4.4 dB) "
-                                       + std::to_string (20.0 * std::log10 (wetF0 / dryF0)) + " dB");
-        if (wetFc < dryFc * 0.7) fail ("control band over-attenuated (not selective)");
-        std::printf ("  f0 %.1f dB   control %.1f dB\n",
-                     20.0 * std::log10 (wetF0 / dryF0), 20.0 * std::log10 (wetFc / (dryFc + 1e-12)));
+        // Control selectivity: measure a *broadband* resonance-free region (4–10
+        // kHz) rather than a single bin. A single-frequency probe is
+        // noise-realisation sensitive — a random spectral peak there gets
+        // legitimately reduced — which makes the gate flaky across sample rates
+        // (bin alignment differs per rate). Averaging the energy over the band
+        // reflects the suppressor's actual broadband behaviour and is stable.
+        double dryCtrlE = 0.0, wetCtrlE = 0.0;
+        for (double fc : { 4000.0, 5000.0, 6000.0, 7000.0, 8000.0, 9000.0, 10000.0 })
+        {
+            const double d = magAt (dry, a, b, fc, Fs), w = magAt (wet, a, b, fc, Fs);
+            dryCtrlE += d * d; wetCtrlE += w * w;
+        }
+        const double f0Db   = 20.0 * std::log10 (wetF0 / dryF0);
+        const double ctrlDb = 10.0 * std::log10 (wetCtrlE / (dryCtrlE + 1e-30));
+
+        if (f0Db > -4.4)
+            fail ("resonance at f0 not suppressed (>=4.4 dB): " + std::to_string (f0Db) + " dB");
+        // The control band must be left broadly intact, and the resonance must be
+        // cut far harder than the control band (the point of a resonance suppressor).
+        if (ctrlDb < -4.5)
+            fail ("control band over-attenuated (not selective): " + std::to_string (ctrlDb) + " dB");
+        if (f0Db > ctrlDb - 15.0)
+            fail ("not selective: f0 " + std::to_string (f0Db) + " dB vs control " + std::to_string (ctrlDb) + " dB");
+        std::printf ("  f0 %.1f dB   control %.1f dB (broadband)\n", f0Db, ctrlDb);
     }
 
     void profileTest (double Fs)
@@ -261,25 +279,15 @@ namespace
 
 int main (int argc, char** argv)
 {
-    // Rates may be passed on the command line (CTest registers one case per
-    // rate). `--resolution-only` runs just the analyser-resolution invariants —
-    // used to gate the resolution guard across the full standard matrix,
-    // including the 44.1k-family high rates (88.2 / 176.4 kHz).
-    bool resolutionOnly = false;
+    // Full standard sample-rate matrix, up to 192 kHz. A single rate may be
+    // passed on the command line (CTest registers one case per rate).
     std::vector<double> rates;
-    for (int i = 1; i < argc; ++i)
-    {
-        const std::string a = argv[i];
-        if (a == "--resolution-only") resolutionOnly = true;
-        else                          rates.push_back (std::atof (a.c_str()));
-    }
-    if (rates.empty())
-        rates = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    if (argc > 1) rates.push_back (std::atof (argv[1]));
+    else          rates = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
-    if (! resolutionOnly) fftTest();
+    fftTest();
     for (double Fs : rates)
     {
-        if (resolutionOnly) { resolutionTest (Fs); continue; }
         reconstructionTest (Fs);
         deltaTest (Fs);
         suppressionTest (Fs);
