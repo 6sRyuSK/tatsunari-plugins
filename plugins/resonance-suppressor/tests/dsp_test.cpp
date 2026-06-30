@@ -12,9 +12,20 @@
 //   5. Reduction profile: zeroing the profile around a resonance disables
 //      suppression there (the "EQ-like" curve scales suppression locally).
 //   6. Stereo link: identical L==R input yields identical L==R output.
+//   7. Resolution vs sample rate: the order chosen by
+//      factory_core::fftOrderForSampleRate keeps the analyser bin width and the
+//      analysis-window length within bounds at every supported rate (incl.
+//      192 kHz), so the low end of the spectrum is never lost. This is the guard
+//      against a fixed FFT order silently degrading at high sample rates.
+//
+// Tests prepare the engine at the same order the plugin would pick
+// (factory_core::fftOrderForSampleRate), so the gates exercise the real
+// high-rate path. The resolution invariant (7) is gated across the full standard
+// matrix up to 192 kHz; the full suite gates 44.1 / 48 / 96 / 192 kHz.
 //
 #include "factory_core/FFT.h"
 #include "factory_core/ResonanceSuppressor.h"
+#include "factory_core/StftResolution.h"
 
 #include <cmath>
 #include <complex>
@@ -31,6 +42,11 @@ namespace
 
     int g_failures = 0;
     void fail (const std::string& m) { std::printf ("  FAIL: %s\n", m.c_str()); ++g_failures; }
+
+    // The STFT order the plugin would use at this sample rate (mirrors
+    // ResonanceSuppressorAudioProcessor). Tests prepare the engine with this so
+    // they exercise the real high-rate path, not a fixed order.
+    int orderFor (double Fs) { return factory_core::fftOrderForSampleRate (Fs, 11, 48000.0, 13); }
 
     // Magnitude of a real signal at frequency f (single-bin DFT over [a,b)).
     double magAt (const std::vector<double>& x, int a, int b, double f, double Fs)
@@ -83,7 +99,7 @@ namespace
     std::vector<double> render (double Fs, const std::vector<double>& xl, const std::vector<double>& xr, Cfg cfg)
     {
         factory_core::ResonanceSuppressor s;
-        s.prepare (Fs, 11);
+        s.prepare (Fs, orderFor (Fs));
         cfg (s);
         std::vector<double> out (xl.size());
         for (size_t n = 0; n < xl.size(); ++n)
@@ -98,8 +114,8 @@ namespace
     void reconstructionTest (double Fs)
     {
         std::printf ("STFT reconstruction + latency @ Fs=%.0f\n", Fs);
-        const int N = 2048;     // window = latency for order 11
-        const int M = 1 << 14;
+        const int N = 1 << orderFor (Fs); // window = latency at the rate's order
+        const int M = std::max (1 << 14, 4 * N);
         std::mt19937 rng (7);
         std::uniform_real_distribution<double> u (-0.5, 0.5);
         std::vector<double> x ((size_t) M);
@@ -109,7 +125,7 @@ namespace
             s.setDepth (0.0); s.setMix (1.0);
         });
 
-        factory_core::ResonanceSuppressor probe; probe.prepare (Fs, 11);
+        factory_core::ResonanceSuppressor probe; probe.prepare (Fs, orderFor (Fs));
         if (probe.latencySamples() != N) fail ("latency != N");
 
         double e = 0.0;
@@ -121,7 +137,8 @@ namespace
     void deltaTest (double Fs)
     {
         std::printf ("Delta (wet + removed == dry) @ Fs=%.0f\n", Fs);
-        const int N = 2048, M = 1 << 14;
+        const int N = 1 << orderFor (Fs);
+        const int M = std::max (1 << 14, 4 * N);
         std::mt19937 rng (11);
         std::normal_distribution<double> g (0.0, 0.3);
         std::vector<double> x ((size_t) M);
@@ -180,7 +197,8 @@ namespace
         const auto masked = render (Fs, x, x, [Fs, f0] (factory_core::ResonanceSuppressor& s) {
             s.setDepth (1.2);
             std::vector<double> prof ((size_t) s.numBins(), 1.0);
-            const int kf = (int) std::round (f0 * 2048.0 / Fs);
+            const int N = 1 << factory_core::fftOrderForSampleRate (Fs, 11, 48000.0, 13);
+            const int kf = (int) std::round (f0 * (double) N / Fs);
             for (int k = kf - 12; k <= kf + 12; ++k)
                 if (k >= 0 && k < s.numBins()) prof[(size_t) k] = 0.0;
             s.setProfile (prof.data(), s.numBins());
@@ -202,7 +220,7 @@ namespace
         std::vector<double> x ((size_t) M);
         for (int n = 0; n < M; ++n) x[(size_t) n] = g (rng) + 0.5 * std::sin (2.0 * kPi * 3000.0 * n / Fs);
 
-        factory_core::ResonanceSuppressor s; s.prepare (Fs, 11);
+        factory_core::ResonanceSuppressor s; s.prepare (Fs, orderFor (Fs));
         s.setDepth (1.2); s.setStereoLink (true);
         double e = 0.0;
         for (int n = 0; n < M; ++n)
@@ -214,22 +232,60 @@ namespace
         if (e > 1.0e-9) fail ("linked L/R diverged err " + std::to_string (e));
         std::printf ("  maxLRdiff=%.2e\n", e);
     }
+
+    // Regression guard for the 192 kHz analyser bug: a fixed FFT order makes the
+    // bin width (fs/N) and window length (N/fs) drift with the sample rate. The
+    // order chosen by fftOrderForSampleRate must keep both within bounds at every
+    // rate, so the analyser always has a data point near 20 Hz and the
+    // suppressor's detection window stays ~constant in time.
+    void resolutionTest (double Fs)
+    {
+        std::printf ("Analyser resolution invariants @ Fs=%.0f\n", Fs);
+        const int order = orderFor (Fs);
+
+        factory_core::ResonanceSuppressor s; s.prepare (Fs, order);
+        const double binHz = s.binToHz (1);                 // lowest non-DC analyser bin
+        const double winMs = 1000.0 * s.latencySamples() / Fs;
+
+        // Bin 1 must reach the bottom of the audible band so a 20 Hz feature is
+        // representable; otherwise the analyser's low end goes blank (the bug).
+        if (binHz > 25.0)
+            fail ("bin width too coarse: " + std::to_string (binHz) + " Hz at Fs=" + std::to_string (Fs));
+        // Window length (and thus reduction behaviour) must stay ~constant in time.
+        if (winMs < 30.0 || winMs > 60.0)
+            fail ("window length out of range: " + std::to_string (winMs) + " ms at Fs=" + std::to_string (Fs));
+
+        std::printf ("  order=%d binHz=%.2f winMs=%.1f\n", order, binHz, winMs);
+    }
 }
 
 int main (int argc, char** argv)
 {
+    // Rates may be passed on the command line (CTest registers one case per
+    // rate). `--resolution-only` runs just the analyser-resolution invariants —
+    // used to gate the resolution guard across the full standard matrix,
+    // including the 44.1k-family high rates (88.2 / 176.4 kHz).
+    bool resolutionOnly = false;
     std::vector<double> rates;
-    if (argc > 1) rates.push_back (std::atof (argv[1]));
-    else          rates = { 44100.0, 48000.0, 96000.0 };
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string a = argv[i];
+        if (a == "--resolution-only") resolutionOnly = true;
+        else                          rates.push_back (std::atof (a.c_str()));
+    }
+    if (rates.empty())
+        rates = { 44100.0, 48000.0, 96000.0, 192000.0 };
 
-    fftTest();
+    if (! resolutionOnly) fftTest();
     for (double Fs : rates)
     {
+        if (resolutionOnly) { resolutionTest (Fs); continue; }
         reconstructionTest (Fs);
         deltaTest (Fs);
         suppressionTest (Fs);
         profileTest (Fs);
         stereoLinkTest (Fs);
+        resolutionTest (Fs);
     }
 
     if (g_failures == 0) { std::printf ("OK: all checks passed.\n"); return 0; }

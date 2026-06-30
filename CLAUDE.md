@@ -37,6 +37,16 @@ is objective; humans judge taste and authorize shipping.
 - Measure the implementation by running real signal through the DSP core. For a
   linear filter, **impulse → FFT** is exact and sufficient; reserve swept-sine +
   deconvolution for non-linear plugins.
+- **Sample-rate matrix (hard rule).** Test every plugin's DSP across the full
+  standard rate set — **44.1 / 48 / 88.2 / 96 / 176.4 / 192 kHz** — not just
+  44.1/48. A gate that stops at 48 kHz hides high-rate regressions.
+- **Resolution must follow the sample rate.** Any FFT/STFT/analyzer size must be
+  **derived from the sample rate**, never a fixed order — use
+  `factory_core::fftOrderForSampleRate`. A fixed order silently degrades at high
+  rates (at 192 kHz an order-11 window has 94 Hz bins, so the analyzer loses
+  everything below ~94 Hz and the detector window shrinks 4×). Assert the
+  **resolution invariants** — bin width (`fs/N`) and window length (`N/fs`) stay
+  in range at the top rate — so this class of bug can't reappear in any plugin.
 
 ## Real-time safety (hard rule)
 - `processBlock` and everything it calls must not allocate, lock, block, or make
