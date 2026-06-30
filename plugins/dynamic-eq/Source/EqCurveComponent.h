@@ -98,6 +98,43 @@ public:
         if (hoveredBand != -1) { hoveredBand = -1; repaint(); }
     }
 
+    // Double-click an empty spot to add a band (type follows the horizontal
+    // position: HP | LowShelf | Bell | HighShelf | LP); double-click a node to
+    // remove that band.
+    void mouseDoubleClick (const juce::MouseEvent& e) override
+    {
+        const int hit = nodeAt (e.position);
+        if (hit >= 0)
+        {
+            setParam (hit, "on", 0.0f); // remove
+            hoveredBand = -1;
+            repaint();
+            return;
+        }
+
+        const int slot = firstFreeBand();
+        if (slot < 0) return; // all bands in use
+
+        const float x = juce::jlimit (plot.getX(), plot.getRight(), e.position.x);
+        const float frac = (x - plot.getX()) / juce::jmax (1.0f, plot.getWidth());
+        const int type = typeForFraction (frac);
+
+        setParam (slot, "type", (float) type);
+        setParam (slot, "freq", xToFreq (x));
+        setParam (slot, "q", 0.707f);
+        if (type != (int) factory_core::BandType::HighPass
+            && type != (int) factory_core::BandType::LowPass)
+        {
+            const float g = yToGain (juce::jlimit (plot.getY(), plot.getBottom(), e.position.y));
+            setParam (slot, "gain", juce::jlimit (-kMaxGain, kMaxGain, g));
+        }
+        setParam (slot, "on", 1.0f); // activate last
+
+        selectedBand = slot;
+        if (onBandSelected) onBandSelected (slot);
+        repaint();
+    }
+
     // Wheel over a node adjusts its Q (Pro-Q style).
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
@@ -141,6 +178,13 @@ private:
     {
         const int t = bandTypeInt (band);
         return t == (int) factory_core::BandType::HighPass || t == (int) factory_core::BandType::LowPass;
+    }
+    // Number of Butterworth sections for an HP/LP band (1 otherwise).
+    int bandStages (int band) const
+    {
+        if (! isCutType (band)) return 1;
+        const int slope = (int) apvts.getRawParameterValue (DynamicEqAudioProcessor::pid (band, "slope"))->load();
+        return juce::jlimit (1, factory_core::DynamicEqBand::kMaxStages, slope + 1);
     }
     bool bandOn (int band) const
     {
@@ -261,8 +305,12 @@ private:
     {
         const double sr = processor.getSampleRateForDisplay();
 
-        // Precompute each band's coefficients once for this frame.
-        std::array<factory_core::BiquadCoeffs, DynamicEqAudioProcessor::kNumBands> coeffs;
+        // Precompute each band's coefficients once for this frame. HP/LP bands
+        // are a cascade of `stages` Butterworth sections (12..96 dB/oct).
+        constexpr int kMaxStages = factory_core::DynamicEqBand::kMaxStages;
+        std::array<std::array<factory_core::BiquadCoeffs, kMaxStages>,
+                   DynamicEqAudioProcessor::kNumBands> coeffs;
+        std::array<int, DynamicEqAudioProcessor::kNumBands> stages {};
         std::array<bool, DynamicEqAudioProcessor::kNumBands> on {};
         for (int b = 0; b < DynamicEqAudioProcessor::kNumBands; ++b)
         {
@@ -271,7 +319,18 @@ private:
             const auto type = static_cast<factory_core::BandType> (bandTypeInt (b));
             const double f = apvts.getRawParameterValue (DynamicEqAudioProcessor::pid (b, "freq"))->load();
             const double q = apvts.getRawParameterValue (DynamicEqAudioProcessor::pid (b, "q"))->load();
-            coeffs[(size_t) b] = factory_core::designFilter (type, f, bandGainDb (b), q, sr);
+            if (isCutType (b))
+            {
+                const int n = bandStages (b);
+                stages[(size_t) b] = n;
+                for (int s = 0; s < n; ++s)
+                    coeffs[(size_t) b][(size_t) s] = factory_core::designHpLpStage (type, f, q, s, n, sr);
+            }
+            else
+            {
+                stages[(size_t) b] = 1;
+                coeffs[(size_t) b][0] = factory_core::designFilter (type, f, bandGainDb (b), q, sr);
+            }
         }
 
         const float y0 = gainToY (0.0f);
@@ -292,7 +351,9 @@ private:
             for (int b = 0; b < DynamicEqAudioProcessor::kNumBands; ++b)
             {
                 if (! on[(size_t) b]) continue;
-                const auto hb = evalH (coeffs[(size_t) b], z1, z2);
+                std::complex<double> hb (1.0, 0.0);
+                for (int s = 0; s < stages[(size_t) b]; ++s)
+                    hb *= evalH (coeffs[(size_t) b][(size_t) s], z1, z2);
                 h *= hb;
 
                 const float dbB = (float) juce::Decibels::gainToDecibels (std::abs (hb), -120.0);
@@ -342,6 +403,7 @@ private:
         for (int b = 0; b < DynamicEqAudioProcessor::kNumBands; ++b)
         {
             const bool on = bandOn (b);
+            if (! on) continue; // only added (active) bands have a node
             const auto p = nodePos (b);
             const bool sel = (b == selectedBand);
             const bool hov = (b == hoveredBand);
@@ -384,10 +446,28 @@ private:
         float bestD = 14.0f;
         for (int b = 0; b < DynamicEqAudioProcessor::kNumBands; ++b)
         {
+            if (! bandOn (b)) continue; // only active bands are selectable
             const float d = nodePos (b).getDistanceFrom (pos);
             if (d <= bestD) { bestD = d; best = b; }
         }
         return best;
+    }
+
+    int firstFreeBand() const
+    {
+        for (int b = 0; b < DynamicEqAudioProcessor::kNumBands; ++b)
+            if (! bandOn (b)) return b;
+        return -1;
+    }
+
+    // Horizontal position -> band type (symmetric): HP | LowShelf | Bell | HighShelf | LP.
+    int typeForFraction (float frac) const
+    {
+        if (frac < 0.12f) return (int) factory_core::BandType::HighPass;
+        if (frac < 0.25f) return (int) factory_core::BandType::LowShelf;
+        if (frac > 0.88f) return (int) factory_core::BandType::LowPass;
+        if (frac > 0.75f) return (int) factory_core::BandType::HighShelf;
+        return (int) factory_core::BandType::Bell;
     }
 
     void setParam (int band, const char* suffix, float value)
@@ -406,8 +486,11 @@ private:
         if (auto* p = apvts.getParameter (DynamicEqAudioProcessor::pid (band, "gain"))) p->endChangeGesture();
     }
 
-    static constexpr int kFftOrder = 11;
-    static constexpr int kFftSize = 1 << kFftOrder; // 2048
+    // Larger FFT so low-frequency bins stay fine even at high sample rates
+    // (at 192 kHz a 2048-point FFT only resolves ~94 Hz/bin, blanking the
+    // sub-100 Hz region; 8192 gives ~23 Hz/bin there).
+    static constexpr int kFftOrder = 13;
+    static constexpr int kFftSize = 1 << kFftOrder; // 8192
     static constexpr float kMaxGain = 24.0f;
 
     DynamicEqAudioProcessor& processor;

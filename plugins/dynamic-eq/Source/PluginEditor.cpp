@@ -24,10 +24,10 @@ DynamicEqAudioProcessorEditor::DynamicEqAudioProcessorEditor (DynamicEqAudioProc
         processor.apvts, "bypass", bypassButton);
 
     setResizable (true, true);
-    setResizeLimits (620, 420, 1280, 860);
+    setResizeLimits (620, 440, 1280, 900);
     if (auto* c = getConstrainer())
-        c->setFixedAspectRatio (740.0 / 480.0);
-    setSize (740, 480);
+        c->setFixedAspectRatio (740.0 / 520.0);
+    setSize (740, 520);
 }
 
 DynamicEqAudioProcessorEditor::~DynamicEqAudioProcessorEditor()
@@ -63,7 +63,7 @@ void DynamicEqAudioProcessorEditor::resized()
     titleLabel.setBounds (top);
 
     r.removeFromTop (10);
-    panel.setBounds (r.removeFromBottom (132));
+    panel.setBounds (r.removeFromBottom (170));
     r.removeFromBottom (12);
     curve.setBounds (r);
 }

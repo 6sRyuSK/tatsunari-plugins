@@ -131,7 +131,7 @@ public:
         g.setColour (text());
         g.setFont (juce::Font (juce::FontOptions (13.0f, juce::Font::bold)));
         g.drawText (b.getButtonText(),
-                    r.withTrimmedLeft ((int) (box.getWidth() + 8.0f)),
+                    r.withTrimmedLeft (box.getWidth() + 8.0f),
                     juce::Justification::centredLeft);
     }
 

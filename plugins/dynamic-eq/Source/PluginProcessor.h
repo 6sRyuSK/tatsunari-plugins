@@ -18,7 +18,7 @@
 class DynamicEqAudioProcessor final : public juce::AudioProcessor
 {
 public:
-    static constexpr int kNumBands = 6;
+    static constexpr int kNumBands = 24;
 
     DynamicEqAudioProcessor();
     ~DynamicEqAudioProcessor() override = default;
@@ -73,9 +73,13 @@ private:
         std::atomic<float>* freq = nullptr;
         std::atomic<float>* gain = nullptr;
         std::atomic<float>* q = nullptr;
+        std::atomic<float>* slope = nullptr;
         std::atomic<float>* dyn = nullptr;
         std::atomic<float>* thr = nullptr;
         std::atomic<float>* rng = nullptr;
+        std::atomic<float>* atk = nullptr;
+        std::atomic<float>* rel = nullptr;
+        std::atomic<float>* knee = nullptr;
     };
 
     std::array<BandParams, kNumBands> params;
@@ -85,7 +89,7 @@ private:
     double currentSampleRate = 44100.0;
 
     // Analyzer ring buffer (single producer: audio thread).
-    static constexpr int kRingSize = 1 << 13; // 8192
+    static constexpr int kRingSize = 1 << 14; // 16384 (>= analyzer FFT, with margin)
     static constexpr int kRingMask = kRingSize - 1;
     std::array<float, kRingSize> analyzerRing {};
     std::atomic<int> ringWrite { 0 };
