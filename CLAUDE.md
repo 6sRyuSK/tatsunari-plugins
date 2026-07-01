@@ -67,6 +67,33 @@ is objective; humans judge taste and authorize shipping.
   thread lock-free (atomics or a lock-free FIFO).
 - pluginval's allocation checks are part of the gate — do not suppress them.
 
+## Regression-prevention invariants (hard rule)
+The bug classes surfaced by issues #22–44 must not recur. Every new plugin and
+every `core/` change is gated on the invariants catalogued in
+**`docs/regression-policy.md`**; the reusable, oracle-free checks live in
+**`core/include/factory_core/testing/DspInvariants.h`** (use them — do not hand-write
+a narrower sample-rate set). The non-negotiables:
+- **Feedback loop gain < 1 at every in-range setting.** COLA-style "unity at one
+  point" formulas must clamp so they never exceed 1 off that point. Verify with
+  `impulseResponseNonIncreasing()` at the *worst-case* setting, all rates — not the
+  one point that happens to be stable.
+- **Bounded resonance.** High-order filter cascades (slope × Q) cap the peak-stage
+  Q; assert a known absolute ceiling (z-domain), not just "peak > 0 dB".
+- **finite guards on every feedback node** so a single NaN/Inf self-heals; assert
+  finiteness *and* a realistic peak bound over a long hold (never a `1e6`
+  "not-NaN" tolerance).
+- **Worst-case buffer sizing** (max delay × modulation headroom) — no silent
+  clamp-to-wrong-value.
+- **State reset** in `prepareToPlay` and on bypass-release / channel-mode
+  transitions (`reset()` or crossfade).
+- **Smooth continuous parameters** (`SmoothedValue`, allocated in `prepareToPlay`).
+- **Full sample-rate matrix + resolution-follows-rate** (already hard rules above).
+- **Tests must exercise the bug path** (worst case, not a lucky point), with an
+  **independent static oracle** for quantitative checks and a real tolerance.
+- **Atomic** for any GUI/audio-shared scalar; **absolute floor** on detectors so
+  silence produces no phantom reduction.
+- Tightening these is welcome; **loosening any tolerance / oracle is "Ask a human".**
+
 ## Catalog & versioning
 - `plugins/<slug>/plugin.toml` is the **single source of truth**. CMake reads
   `version` from it, so catalog == binary == release.
