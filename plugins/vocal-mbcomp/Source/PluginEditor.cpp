@@ -50,10 +50,12 @@ VocalMbCompAudioProcessorEditor::VocalMbCompAudioProcessorEditor (VocalMbCompAud
     atts.push_back (attach ("highfreq", highFreq));
     bypassAtt = std::make_unique<ButtonAttachment> (processor.apvts, "bypass", bypassButton);
 
-    // Continuous (skewed) params otherwise show 7 decimals; cap to 2.
-    for (auto* sl : { &trimLow, &trimMid, &trimHigh, &compress, &output, &mix, &lowFreq, &highFreq })
-        if (sl->getInterval() == 0.0)
-            sl->setNumDecimalPlacesToDisplay (2);
+    // Pin the text-box precision. Must run after the attachments above, which
+    // otherwise format continuous ranges with up to 7 decimals (see #23). % and
+    // crossover Hz as integers; dB to 2 dp.
+    for (auto* sl : { &trimLow, &trimMid, &trimHigh, &compress, &mix, &lowFreq, &highFreq })
+        factory_ui::setSliderDecimals (*sl, 0);
+    factory_ui::setSliderDecimals (output, 2);
 
     setSize (640, 460);
 }

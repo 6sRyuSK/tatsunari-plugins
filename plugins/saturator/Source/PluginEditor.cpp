@@ -26,6 +26,13 @@ SaturatorAudioProcessorEditor::SaturatorAudioProcessorEditor (SaturatorAudioProc
     outputAtt = std::make_unique<SliderAttachment> (s, "output", outputSlider);
     bypassAtt = std::make_unique<ButtonAttachment> (s, "bypass", bypassButton);
 
+    // Pin the text-box precision. Must run after the attachments above, which
+    // otherwise format continuous ranges with up to 7 decimals (see #23). dB to
+    // 2 dp; % as an integer.
+    factory_ui::setSliderDecimals (driveSlider, 2);
+    factory_ui::setSliderDecimals (outputSlider, 2);
+    factory_ui::setSliderDecimals (mixSlider, 0);
+
     setSize (460, 380);
 }
 

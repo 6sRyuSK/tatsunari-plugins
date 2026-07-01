@@ -16,18 +16,19 @@ GranularDelayAudioProcessorEditor::GranularDelayAudioProcessorEditor (GranularDe
 
     addAndMakeVisible (cloud);
 
-    // Order matters for layout.
-    addKnob ("delay",     "Delay",      " ms");
-    addKnob ("feedback",  "Feedback",   " %");
-    addKnob ("mix",       "Mix",        " %");
-    addKnob ("grainsize", "Grain",      " ms");
-    addKnob ("density",   "Density",    " Hz");
-    addKnob ("jitter",    "Jitter",     " ms");
-    addKnob ("pitch",     "Pitch",      " st");
-    addKnob ("pitchrand", "Pitch Rnd",  " st");
-    addKnob ("spread",    "Spread",     " %");
-    addKnob ("lforate",   "LFO Rate",   " Hz");
-    addKnob ("lfodepth",  "LFO Depth",  " %");
+    // Order matters for layout. Decimals: % integer; ms / st(fine) / rate-Hz to
+    // 2 dp; pitch is whole semitones (0 dp).
+    addKnob ("delay",     "Delay",      " ms", 2);
+    addKnob ("feedback",  "Feedback",   " %",  0);
+    addKnob ("mix",       "Mix",        " %",  0);
+    addKnob ("grainsize", "Grain",      " ms", 2);
+    addKnob ("density",   "Density",    " Hz", 2);
+    addKnob ("jitter",    "Jitter",     " ms", 2);
+    addKnob ("pitch",     "Pitch",      " st", 0);
+    addKnob ("pitchrand", "Pitch Rnd",  " st", 2);
+    addKnob ("spread",    "Spread",     " %",  0);
+    addKnob ("lforate",   "LFO Rate",   " Hz", 2);
+    addKnob ("lfodepth",  "LFO Depth",  " %",  0);
 
     syncButton.setColour (juce::ToggleButton::textColourId, FactoryLookAndFeel::textDim());
     addAndMakeVisible (syncButton);
@@ -48,24 +49,21 @@ GranularDelayAudioProcessorEditor::~GranularDelayAudioProcessorEditor()
     setLookAndFeel (nullptr);
 }
 
-void GranularDelayAudioProcessorEditor::addKnob (const char* id, const char* name, const char* suffix)
+void GranularDelayAudioProcessorEditor::addKnob (const char* id, const char* name, const char* suffix, int decimals)
 {
-    auto slider = std::make_unique<juce::Slider> (juce::Slider::RotaryHorizontalVerticalDrag,
-                                                  juce::Slider::TextBoxBelow);
-    slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
-    slider->setTextValueSuffix (suffix);
+    auto slider = std::make_unique<juce::Slider>();
+    auto label  = std::make_unique<juce::Label>();
+    // styleKnob sets the value-box text colour on the slider itself; without it
+    // the box keeps the stale (white) colour the default LookAndFeel baked in at
+    // construction, since the editor's LnF isn't re-applied to it (see #54 white text).
+    factory_ui::styleKnob (*slider, *label, name, suffix);
     addAndMakeVisible (*slider);
-
-    auto label = std::make_unique<juce::Label>();
-    label->setText (name, juce::dontSendNotification);
-    label->setJustificationType (juce::Justification::centred);
-    label->setColour (juce::Label::textColourId, FactoryLookAndFeel::text());
     addAndMakeVisible (*label);
 
     knobAtts.push_back (std::make_unique<SliderAttachment> (processor.apvts, id, *slider));
-    // Continuous (skewed) params otherwise show 7 decimals; cap to 2.
-    if (slider->getInterval() == 0.0)
-        slider->setNumDecimalPlacesToDisplay (2);
+    // Pin the text-box precision. Must run after the attachment, which otherwise
+    // formats continuous ranges with up to 7 decimals (see #23/#26).
+    factory_ui::setSliderDecimals (*slider, decimals);
     knobs.push_back (std::move (slider));
     knobLabels.push_back (std::move (label));
 }

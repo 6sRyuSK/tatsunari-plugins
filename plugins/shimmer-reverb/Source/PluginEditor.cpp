@@ -18,17 +18,18 @@ ShimmerReverbAudioProcessorEditor::ShimmerReverbAudioProcessorEditor (ShimmerRev
 
     addAndMakeVisible (visualizer);
 
-    addKnob ("size",     "Size",      " %");
-    addKnob ("decay",    "Decay",     " s");
-    addKnob ("damping",  "Damping",   " %");
-    addKnob ("predelay", "Pre-Delay", " ms");
-    addKnob ("mix",      "Mix",       " %");
-    addKnob ("shimmer",  "Shimmer",   " %");
-    addKnob ("voicemix", "Voice Mix", " %");
-    addKnob ("lowcut",   "Low Cut",   " Hz");
-    addKnob ("highcut",  "High Cut",  " Hz");
-    addKnob ("modrate",  "Mod Rate",  " Hz");
-    addKnob ("moddepth", "Mod Depth", " %");
+    // Decimals: % integer; cutoff-Hz integer; s / ms / rate-Hz to 2 dp.
+    addKnob ("size",     "Size",      " %",  0);
+    addKnob ("decay",    "Decay",     " s",  2);
+    addKnob ("damping",  "Damping",   " %",  0);
+    addKnob ("predelay", "Pre-Delay", " ms", 2);
+    addKnob ("mix",      "Mix",       " %",  0);
+    addKnob ("shimmer",  "Shimmer",   " %",  0);
+    addKnob ("voicemix", "Voice Mix", " %",  0);
+    addKnob ("lowcut",   "Low Cut",   " Hz", 0);
+    addKnob ("highcut",  "High Cut",  " Hz", 0);
+    addKnob ("modrate",  "Mod Rate",  " Hz", 2);
+    addKnob ("moddepth", "Mod Depth", " %",  0);
 
     setupPitchBox (pitchABox, pitchALabel, "Pitch A");
     setupPitchBox (pitchBBox, pitchBLabel, "Pitch B");
@@ -47,24 +48,21 @@ ShimmerReverbAudioProcessorEditor::~ShimmerReverbAudioProcessorEditor()
     setLookAndFeel (nullptr);
 }
 
-void ShimmerReverbAudioProcessorEditor::addKnob (const char* id, const char* name, const char* suffix)
+void ShimmerReverbAudioProcessorEditor::addKnob (const char* id, const char* name, const char* suffix, int decimals)
 {
-    auto slider = std::make_unique<juce::Slider> (juce::Slider::RotaryHorizontalVerticalDrag,
-                                                  juce::Slider::TextBoxBelow);
-    slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
-    slider->setTextValueSuffix (suffix);
+    auto slider = std::make_unique<juce::Slider>();
+    auto label  = std::make_unique<juce::Label>();
+    // styleKnob sets the value-box text colour on the slider itself; without it
+    // the box keeps the stale (white) colour the default LookAndFeel baked in at
+    // construction, since the editor's LnF isn't re-applied to it (see #54 white text).
+    factory_ui::styleKnob (*slider, *label, name, suffix);
     addAndMakeVisible (*slider);
-
-    auto label = std::make_unique<juce::Label>();
-    label->setText (name, juce::dontSendNotification);
-    label->setJustificationType (juce::Justification::centred);
-    label->setColour (juce::Label::textColourId, FactoryLookAndFeel::text());
     addAndMakeVisible (*label);
 
     knobAtts.push_back (std::make_unique<SliderAttachment> (processor.apvts, id, *slider));
-    // Continuous (skewed) params otherwise show 7 decimals; cap to 2.
-    if (slider->getInterval() == 0.0)
-        slider->setNumDecimalPlacesToDisplay (2);
+    // Pin the text-box precision. Must run after the attachment, which otherwise
+    // formats continuous ranges with up to 7 decimals (see #23/#26).
+    factory_ui::setSliderDecimals (*slider, decimals);
     knobs.push_back (std::move (slider));
     knobLabels.push_back (std::move (label));
 }

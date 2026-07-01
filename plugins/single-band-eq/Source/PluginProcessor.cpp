@@ -13,15 +13,17 @@ SingleBandEqAudioProcessor::createParameterLayout()
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
     // Show at most 2 decimal places (the generic editor otherwise shows many for
-    // the continuous, skewed ranges).
+    // the continuous, skewed ranges); frequency reads as an integer Hz.
     auto twoDp = juce::AudioParameterFloatAttributes()
                      .withStringFromValueFunction ([] (float v, int) { return juce::String (v, 2); });
+    auto intDp = juce::AudioParameterFloatAttributes()
+                     .withStringFromValueFunction ([] (float v, int) { return juce::String (juce::roundToInt (v)); });
 
     // frequency: 20 Hz .. 20 kHz, logarithmic, default 1 kHz.
     juce::NormalisableRange<float> freqRange { 20.0f, 20000.0f };
     freqRange.setSkewForCentre (632.455f); // geometric mean of the range
     layout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID { "frequency", 1 }, "Frequency", freqRange, kFreqDefault, twoDp));
+        juce::ParameterID { "frequency", 1 }, "Frequency", freqRange, kFreqDefault, intDp));
 
     // gain: -24 .. +24 dB, default 0 dB.
     layout.add (std::make_unique<juce::AudioParameterFloat> (
