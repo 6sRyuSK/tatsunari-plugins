@@ -3,52 +3,60 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include "PluginProcessor.h"
+#include "NodePanel.h"
 #include "factory_ui/FactoryLookAndFeel.h"
 #include "factory_ui/FactoryChrome.h"
 
+#include <array>
 #include <cmath>
 
 //
 // The centrepiece: a spectrum display showing the output (post-processing)
 // magnitude, the live per-frequency gain reduction (teal "curtain" — what the
-// suppressor is cutting right now), and the soothe-style reduction-profile
-// curve with fixed nodes: a low cut and a high cut (drag frequency; right-click
-// for slope or on/off) plus four typed bands (drag frequency/sensitivity;
-// right-click for type or on/off). Disabled nodes stay dimmed (never hidden) so
-// they can always be re-enabled. Edits go through the APVTS. GUI-thread only.
+// suppressor is cutting right now), and the soothe-style reduction-profile curve
+// with fixed nodes: a low cut and a high cut (drag frequency) plus four typed
+// bands (drag frequency/sensitivity). Selecting a node opens a small bright
+// inline editor (On + slope/type + freq [+ sens]) over the analyser bottom.
+// Disabled nodes stay dimmed (never hidden). Edits go through the APVTS.
+// GUI-thread only.
 //
 class SuppressionCurveComponent : public juce::Component,
                                   private juce::Timer
 {
 public:
     SuppressionCurveComponent (ResonanceSuppressorAudioProcessor& p, juce::AudioProcessorValueTreeState& s)
-        : processor (p), apvts (s)
+        : processor (p), apvts (s), panel (s)
     {
+        addChildComponent (panel); // shown when a node is selected
         startTimerHz (30);
     }
 
     void paint (juce::Graphics& g) override
     {
-        auto r = getLocalBounds().toFloat();
-        factory_ui::paintCard (g, r, 10.0f);
-
-        plot = r.reduced (12.0f);
-        plot.removeFromBottom (14.0f); // Hz labels
+        factory_ui::paintCard (g, getLocalBounds().toFloat(), 10.0f);
+        plot = plotRect();
 
         drawGrid (g);
         drawAnalyzer (g);
         drawReduction (g);
         drawProfile (g);
         drawNodes (g);
+
+        // Soft shadow so the selected-node editor floats above the analyser.
+        if (panel.isVisible())
+            factory_ui::dropShadowFor (g, panel.getBounds(), 12.0f);
+    }
+
+    void resized() override
+    {
+        if (panel.isVisible()) positionPanel();
     }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
         const int hit = nodeAt (e.position);
-        if (hit < 0) return;
-
-        if (e.mods.isPopupMenu()) { showNodeMenu (hit); return; }
-
+        if (hit < 0) { selectNode (-1); return; } // click empty space -> close editor
+        selectNode (hit);                          // selecting a node opens its editor
         dragging = hit;
         beginGesture (hit);
     }
@@ -75,6 +83,13 @@ private:
     static constexpr float kMinDb = -90.0f, kMaxDb = 6.0f;    // analyser axis
     static constexpr float kSensMin = -30.0f, kSensMax = 30.0f; // profile (sens) axis
     static constexpr int   kNumNodes = 2 + ResonanceSuppressorAudioProcessor::kNumBands; // LC, HC, bands
+
+    juce::Rectangle<float> plotRect() const
+    {
+        auto r = getLocalBounds().toFloat().reduced (12.0f);
+        r.removeFromBottom (14.0f); // Hz labels
+        return r;
+    }
 
     // Node id: 0 = low cut, 1 = high cut, 2.. = band 0..
     static bool isCut (int id) { return id < 2; }
@@ -270,6 +285,11 @@ private:
             g.fillEllipse (juce::Rectangle<float> (18.0f, 18.0f).withCentre (p));
             g.setColour (col.withAlpha (a));
             g.fillEllipse (juce::Rectangle<float> (14.0f, 14.0f).withCentre (p));
+            if (id == selectedNode) // ring the node whose editor is open
+            {
+                g.setColour (FactoryLookAndFeel::text().withAlpha (0.9f));
+                g.drawEllipse (juce::Rectangle<float> (21.0f, 21.0f).withCentre (p), 1.6f);
+            }
             g.setColour (juce::Colours::white.withAlpha (a));
             g.setFont (juce::Font (juce::FontOptions (9.0f, juce::Font::bold)));
             const juce::String label = isCut (id) ? (id == 0 ? "LC" : "HC") : juce::String (id - 1);
@@ -288,28 +308,25 @@ private:
         return best;
     }
 
-    // Right-click: On/Off + (cut) slope or (band) type. Radio-ticks the current.
-    void showNodeMenu (int id)
+    // Selecting a node opens the inline editor bound to it; -1 closes it.
+    void selectNode (int id)
     {
-        static const juce::StringArray slopes { "6 dB/oct", "12 dB/oct", "24 dB/oct", "48 dB/oct" };
-        static const juce::StringArray types  { "Bell", "Low Shelf", "High Shelf", "Band Shelf", "Band Reject", "Tilt" };
-        const auto& items = isCut (id) ? slopes : types;
-        const char* choiceSuffix = isCut (id) ? "slope" : "type";
-        const int current = (int) apvts.getRawParameterValue (pid (id, choiceSuffix))->load();
+        selectedNode = id;
+        if (id >= 0) { panel.setNode (id); panel.setVisible (true); positionPanel(); }
+        else         panel.setVisible (false);
+        repaint();
+    }
 
-        juce::PopupMenu m;
-        m.addItem (1, "On", true, nodeOn (id));
-        m.addSeparator();
-        for (int i = 0; i < items.size(); ++i)
-            m.addItem (100 + i, items[i], true, i == current);
-
-        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this),
-                         [this, id, choiceSuffix] (int result)
-                         {
-                             if (result == 1) setParam (pid (id, "on"), nodeOn (id) ? 0.0f : 1.0f);
-                             else if (result >= 100) setParam (pid (id, choiceSuffix), (float) (result - 100));
-                             repaint();
-                         });
+    // Park the editor at the analyser's bottom-centre, just above the Hz labels.
+    void positionPanel()
+    {
+        const auto pr = plotRect();
+        const int w = panel.preferredWidth();
+        const int h = NodePanel::kHeight;
+        int x = juce::roundToInt (pr.getCentreX() - w * 0.5f);
+        x = juce::jlimit ((int) pr.getX(), juce::jmax ((int) pr.getX(), (int) pr.getRight() - w), x);
+        const int y = juce::roundToInt (pr.getBottom()) - h - 6;
+        panel.setBounds (x, y, w, h);
     }
 
     void setParam (const juce::String& id, float value)
@@ -331,8 +348,10 @@ private:
 
     ResonanceSuppressorAudioProcessor& processor;
     juce::AudioProcessorValueTreeState& apvts;
+    NodePanel panel;
     juce::Rectangle<float> plot;
     int dragging = -1;
+    int selectedNode = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SuppressionCurveComponent)
 };
