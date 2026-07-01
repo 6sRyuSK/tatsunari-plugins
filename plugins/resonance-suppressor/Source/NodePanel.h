@@ -12,17 +12,19 @@
 //
 // A small, bright inline editor for the currently-selected reduction node, shown
 // over the analyser (bottom-centre) when a node is selected. It rebinds its APVTS
-// attachments to that node on selection (Pro-Q-style). The node name is *painted*
-// (floating) at the top-centre so it never steals layout height from the knobs;
-// below it a centred control row: cut nodes show On + Slope + Freq, band nodes
-// show On + Type + Freq + Sens. Frequencies read in kHz at/above 1 kHz.
-// Horizontal "kawaii" card styling (factory_ui). GUI-thread only.
+// attachments to that node on selection (Pro-Q-style). Layout: On (top-left) with
+// the node name painted to its right, the slope/type selector below, and the
+// Freq [+ Sens] knobs filling the full height on the right. Frequencies read in
+// kHz at/above 1 kHz. Horizontal "kawaii" card styling (factory_ui).
+// GUI-thread only.
 //
 class NodePanel : public juce::Component
 {
 public:
     explicit NodePanel (juce::AudioProcessorValueTreeState& s) : apvts (s)
     {
+        setLookAndFeel (&lnf); // knob captions / value boxes / combo text at 11 px
+
         onButton.setButtonText ("On");
         addAndMakeVisible (onButton);
 
@@ -35,6 +37,8 @@ public:
         factory_ui::styleKnob (sensSlider, sensLabel, "Sens", " dB");
         addAndMakeVisible (sensSlider); addAndMakeVisible (sensLabel);
     }
+
+    ~NodePanel() override { setLookAndFeel (nullptr); }
 
     int  currentNode()    const noexcept { return nodeId; }
     bool isCutNode()      const noexcept { return isCut; }
@@ -91,41 +95,52 @@ public:
     void paint (juce::Graphics& g) override
     {
         factory_ui::paintCard (g, getLocalBounds().toFloat(), 12.0f);
-        // Floating node name — painted, not a child, so it costs no layout height.
+        // Floating node name, painted to the right of the On toggle.
         g.setColour (nameCol);
         g.setFont (juce::Font (juce::FontOptions (14.0f, juce::Font::bold)));
-        g.drawText (nameText, getLocalBounds().removeFromTop (24).reduced (8, 5),
-                    juce::Justification::centred);
+        g.drawText (nameText, nameArea, juce::Justification::centredLeft);
     }
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced (12, 6);
-        r.removeFromTop (18); // clear the floating name strip (drawn in paint)
-        r.removeFromTop (2);
+        auto r = getLocalBounds().reduced (10, 8);
 
-        // Bigger Freq/Sens knobs (~80% of the Depth knob) — centre the row.
-        constexpr int on = 54, combo = 72, knobW = 64, gap = 10;
-        const int total = on + gap + combo + gap + knobW + (isCut ? 0 : gap + knobW);
-        r.removeFromLeft (juce::jmax (0, (r.getWidth() - total) / 2));
+        // Right: Freq (+ Sens) knobs filling the full height.
+        constexpr int knobW = 64, kgap = 8;
+        auto knobs = r.removeFromRight (isCut ? knobW : knobW * 2 + kgap);
+        r.removeFromRight (12); // gap before the knobs
 
-        onButton.setBounds  (r.removeFromLeft (on).withSizeKeepingCentre (on, 24));
-        r.removeFromLeft (gap);
-        choiceBox.setBounds (r.removeFromLeft (combo).withSizeKeepingCentre (combo, 28));
-        r.removeFromLeft (gap);
+        // Left-top: On (top-left) + node name to its right.
+        auto topRow = r.removeFromTop (24);
+        onButton.setBounds (topRow.removeFromLeft (46).withSizeKeepingCentre (46, 22));
+        topRow.removeFromLeft (6);
+        nameArea = topRow; // name painted here
+        r.removeFromTop (8);
+        choiceBox.setBounds (r.removeFromTop (26));
 
-        auto knob = [&r] (juce::Slider& s, juce::Label& l)
+        auto col = [] (juce::Rectangle<int> c, juce::Slider& s, juce::Label& l)
         {
-            auto c = r.removeFromLeft (knobW);
-            l.setBounds (c.removeFromTop (12));
-            s.setBounds (c);              // slider fills the rest (~54 px)
-            r.removeFromLeft (gap);
+            l.setBounds (c.removeFromTop (13));
+            s.setBounds (c); // rotary + value box fill the rest (full height)
         };
-        knob (freqSlider, freqLabel);
-        if (! isCut) knob (sensSlider, sensLabel);
+        if (isCut) col (knobs, freqSlider, freqLabel);
+        else
+        {
+            col (knobs.removeFromLeft (knobW), freqSlider, freqLabel);
+            knobs.removeFromLeft (kgap);
+            col (knobs, sensSlider, sensLabel);
+        }
     }
 
 private:
+    // FactoryLookAndFeel but with slightly smaller (11 px) label text for the knob
+    // captions / value boxes / combo — FactoryLookAndFeel::getLabelFont is fixed
+    // at 13 px, so we override just that.
+    struct PanelLnF : FactoryLookAndFeel
+    {
+        juce::Font getLabelFont (juce::Label&) override { return juce::Font (juce::FontOptions (11.0f)); }
+    };
+
     juce::String pid (const char* s) const
     {
         return isCut ? ResonanceSuppressorAudioProcessor::cutPid  (nodeId, s)
@@ -141,11 +156,13 @@ private:
         return isCut ? FactoryLookAndFeel::accent() : FactoryLookAndFeel::bandColour (nodeId - 2);
     }
 
+    PanelLnF lnf;
     juce::AudioProcessorValueTreeState& apvts;
     int  nodeId = 0;
     bool isCut  = true;
     juce::String nameText;
     juce::Colour nameCol { FactoryLookAndFeel::accent() };
+    juce::Rectangle<int> nameArea;
 
     juce::ToggleButton onButton;
     juce::ComboBox choiceBox;
