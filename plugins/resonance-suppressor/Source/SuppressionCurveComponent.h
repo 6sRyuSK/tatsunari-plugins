@@ -132,9 +132,6 @@ private:
             g.setColour (FactoryLookAndFeel::track().withAlpha (db == 0.0f ? 0.9f : 0.4f));
             g.drawHorizontalLine ((int) y, plot.getX(), plot.getRight());
         }
-        // Nominal (0 dB sensitivity) reference for the profile curve.
-        g.setColour (FactoryLookAndFeel::track().withAlpha (0.35f));
-        g.drawHorizontalLine ((int) sensToY (0.0f), plot.getX(), plot.getRight());
     }
 
     void drawAnalyzer (juce::Graphics& g)
@@ -253,11 +250,11 @@ private:
             g.strokePath (nodePath[(size_t) id], juce::PathStrokeType (1.0f, juce::PathStrokeType::curved));
         }
 
-        // Combined response: soft glow under a crisp stroke.
-        g.setColour (FactoryLookAndFeel::text().withAlpha (0.16f));
+        // Combined response: soft coral glow under a crisp coral stroke.
+        g.setColour (FactoryLookAndFeel::accent().withAlpha (0.22f));
         g.strokePath (combined, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (FactoryLookAndFeel::text().withAlpha (0.9f));
-        g.strokePath (combined, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (FactoryLookAndFeel::accent());
+        g.strokePath (combined, juce::PathStrokeType (2.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
     void drawNodes (juce::Graphics& g)
