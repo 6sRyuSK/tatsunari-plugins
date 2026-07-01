@@ -10,12 +10,12 @@
 
 //
 // The centrepiece: a spectrum display showing the output (post-processing)
-// magnitude, the live
-// per-frequency gain reduction (teal "curtain" — what the suppressor is cutting
-// right now), and the soothe-style reduction-profile curve with fixed nodes:
-// a low cut and a high cut (drag frequency; right-click for slope) plus four
-// typed bands (drag frequency/sensitivity; right-click for type). Double-click
-// toggles a node on/off. Edits go through the APVTS. GUI-thread only.
+// magnitude, the live per-frequency gain reduction (teal "curtain" — what the
+// suppressor is cutting right now), and the soothe-style reduction-profile
+// curve with fixed nodes: a low cut and a high cut (drag frequency; right-click
+// for slope or on/off) plus four typed bands (drag frequency/sensitivity;
+// right-click for type or on/off). Disabled nodes stay dimmed (never hidden) so
+// they can always be re-enabled. Edits go through the APVTS. GUI-thread only.
 //
 class SuppressionCurveComponent : public juce::Component,
                                   private juce::Timer
@@ -67,12 +67,6 @@ public:
     {
         if (dragging >= 0) endGesture (dragging);
         dragging = -1;
-    }
-
-    void mouseDoubleClick (const juce::MouseEvent& e) override
-    {
-        const int hit = nodeAt (e.position);
-        if (hit >= 0) { setParam (pid (hit, "on"), nodeOn (hit) ? 0.0f : 1.0f); repaint(); }
     }
 
 private:
@@ -223,14 +217,16 @@ private:
     {
         for (int id = 0; id < kNumNodes; ++id)
         {
-            if (! nodeOn (id)) continue;
+            // Disabled nodes stay visible (dimmed), never hidden, so they can
+            // always be grabbed / re-enabled — a hidden node is unreachable.
+            const float a = nodeOn (id) ? 1.0f : 0.3f;
             const auto p = nodePos (id);
             const auto col = isCut (id) ? FactoryLookAndFeel::textDim() : FactoryLookAndFeel::bandColour (id - 2);
-            g.setColour (juce::Colours::white);
+            g.setColour (juce::Colours::white.withAlpha (a));
             g.fillEllipse (juce::Rectangle<float> (18.0f, 18.0f).withCentre (p));
-            g.setColour (col);
+            g.setColour (col.withAlpha (a));
             g.fillEllipse (juce::Rectangle<float> (14.0f, 14.0f).withCentre (p));
-            g.setColour (juce::Colours::white);
+            g.setColour (juce::Colours::white.withAlpha (a));
             g.setFont (juce::Font (juce::FontOptions (9.0f, juce::Font::bold)));
             const juce::String label = isCut (id) ? (id == 0 ? "LC" : "HC") : juce::String (id - 1);
             g.drawText (label, juce::Rectangle<float> (16.0f, 16.0f).withCentre (p), juce::Justification::centred);
@@ -240,9 +236,8 @@ private:
     int nodeAt (juce::Point<float> pos) const
     {
         int best = -1; float bestD = 14.0f;
-        for (int id = 0; id < kNumNodes; ++id)
+        for (int id = 0; id < kNumNodes; ++id) // includes disabled nodes (they stay grabbable)
         {
-            if (! nodeOn (id)) continue;
             const float d = nodePos (id).getDistanceFrom (pos);
             if (d <= bestD) { bestD = d; best = id; }
         }
