@@ -43,6 +43,40 @@ bundles into your plugin folders:
 - **AU** (`.component`) → `~/Library/Audio/Plug-Ins/Components/` (or `/Library/...` for all users)
 - **VST3** (`.vst3`) → `~/Library/Audio/Plug-Ins/VST3/` (or `/Library/...`)
 
+<!-- BEGIN:INSTALL -->
+### curl でインストール
+
+The commands below install the **everything bundle** (all plugins) for **all
+users**. Asset filenames embed the release version, so replace `2026.1` /
+`v2026_1` with the tag you want from the
+[Releases page](https://github.com/6sRyuSK/tatsunari-plugins/releases).
+Downloading with `curl` also skips the `com.apple.quarantine` flag a browser
+attaches, so the macOS "damaged" prompt below does **not** appear. Restart your
+DAW and rescan afterwards.
+
+#### macOS — AU (`.component`)
+
+    curl -fL https://github.com/6sRyuSK/tatsunari-plugins/releases/download/2026.1/tatsunari-plugins-v2026_1-macOS-AU.zip -o /tmp/tp-au.zip
+    sudo unzip -o /tmp/tp-au.zip -d /Library/Audio/Plug-Ins/Components
+    rm -f /tmp/tp-au.zip
+
+#### macOS — VST3 (`.vst3`)
+
+    curl -fL https://github.com/6sRyuSK/tatsunari-plugins/releases/download/2026.1/tatsunari-plugins-v2026_1-macOS-VST3.zip -o /tmp/tp-vst3.zip
+    sudo unzip -o /tmp/tp-vst3.zip -d /Library/Audio/Plug-Ins/VST3
+    rm -f /tmp/tp-vst3.zip
+
+#### Windows — VST3 (`.vst3`, PowerShell as Administrator)
+
+    Invoke-WebRequest https://github.com/6sRyuSK/tatsunari-plugins/releases/download/2026.1/tatsunari-plugins-v2026_1-Windows.zip -OutFile tp-win.zip
+    Expand-Archive tp-win.zip -DestinationPath "C:\Program Files\Common Files\VST3" -Force
+    Remove-Item tp-win.zip
+
+The bundles are **not code-signed or notarized**, but each release ships a
+build-provenance attestation (`gh attestation verify`) and `SHA256SUMS.txt` — see
+the release notes to verify a download before trusting it.
+<!-- END:INSTALL -->
+
 ### macOS: "「…」は壊れているため開けません" / "…is damaged and can't be opened"
 
 The release binaries are **not code-signed or notarized**, and macOS attaches a
