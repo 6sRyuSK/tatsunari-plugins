@@ -222,23 +222,35 @@ jobs:
           if [ -n "$prev" ]; then range="$prev..HEAD"; else range="HEAD"; fi
           echo "Changelog range: ${prev:-<start>}..HEAD (path: plugins/$slug)"
 
-          # Group commits into Features / Fixes / Other by subject keyword. The
-          # repo has no conventional-commit prefixes, so this is a heuristic:
-          # a `fix`/`bug` subject is a fix, an `Add`/`feat` subject is a feature,
-          # everything else falls through to Other. (Adopting feat:/fix: prefixes
-          # would make this exact — both forms are matched.) Order within a group
-          # stays newest-first, as `git log` returns it.
+          # Group commits into Features / Fixes / Other. Conventional-commit
+          # prefixes are authoritative: `feat:` -> 機能, `fix:` -> 修正, any other
+          # type (docs/refactor/chore/ci/…) -> その他, and the `type(scope)!:`
+          # prefix is stripped from the displayed text. Commits without a prefix
+          # fall back to a keyword heuristic (Add/introduce -> feature, fix/bug ->
+          # fix). Order within a group stays newest-first, as `git log` returns it.
           git log $range --no-merges --pretty='%s|%h' -- "plugins/${slug}/" > commits.txt || true
           feats=""; fixes=""; others=""
           while IFS='|' read -r subj hash; do
             [ -z "$subj" ] && continue
-            line="- ${subj} (${hash})"
             lc=$(printf '%s' "$subj" | tr '[:upper:]' '[:lower:]')
-            case "$lc" in
-              *fix*|*bug*|*regression*|*hotfix*|*correct*) fixes+="${line}"$'\n' ;;
-              add\ *|feat*|*introduce*)                    feats+="${line}"$'\n' ;;
-              *)                                           others+="${line}"$'\n' ;;
+            type=$(printf '%s' "$lc" | sed -nE 's/^([a-z]+)(\([^)]*\))?!?:.*/\1/p')
+            display="$subj"
+            case "$type" in
+              feat|fix|docs|refactor|perf|test|chore|ci|build|style|revert)
+                display=$(printf '%s' "$subj" | sed -E 's/^[a-zA-Z]+(\([^)]*\))?!?:[[:space:]]*//') ;;
+              *) type="" ;;
             esac
+            line="- ${display} (${hash})"
+            if   [ "$type" = "fix" ];  then fixes+="${line}"$'\n'
+            elif [ "$type" = "feat" ]; then feats+="${line}"$'\n'
+            elif [ -n "$type" ];       then others+="${line}"$'\n'
+            else
+              case "$lc" in
+                *fix*|*bug*|*regression*|*hotfix*|*correct*) fixes+="${line}"$'\n' ;;
+                add\ *|*introduce*)                          feats+="${line}"$'\n' ;;
+                *)                                           others+="${line}"$'\n' ;;
+              esac
+            fi
           done < commits.txt
 
           {

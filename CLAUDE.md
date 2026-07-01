@@ -9,6 +9,13 @@ is objective; humans judge taste and authorize shipping.
 - Respond to the user in **Japanese** (ユーザーへの応答はすべて日本語で行う).
 - Keep code, identifiers, filenames, and **commit messages in English** — the
   codebase and tooling convention. PR / issue descriptions may be in Japanese.
+- **Commit subjects use a Conventional-Commits prefix**: `feat:` (new feature/
+  param), `fix:` (bug fix), or one of `docs: / refactor: / perf: / test: /
+  chore: / ci: / build: / style:` for the rest. An optional `(scope)` is allowed
+  (e.g. `feat(dynamic-eq): …`). The release changelog groups by this prefix —
+  `feat:` → 機能, `fix:` → 修正, everything else → その他 — so the prefix keeps
+  release notes accurate. Keep the version bump for a change in the **same
+  commit** as the change it describes, so it shows in that plugin's notes.
 
 ## Repository layout
 - `core/` — shared, spec'd DSP primitives (filters, dynamics, …). Versioned;
