@@ -53,6 +53,13 @@ ResonanceSuppressorAudioProcessor::createParameterLayout()
     layout.add (std::make_unique<AudioParameterBool> (ParameterID { "link", 1 },   "Stereo Link", true));
     layout.add (std::make_unique<AudioParameterBool> (ParameterID { "bypass", 1 }, "Bypass", false));
 
+    // Detection mode. Soft (default): adaptive threshold, level-independent —
+    // reacts to relative tonal change. Hard: absolute-level threshold (Depth sets
+    // it), reacts to absolute harmonic level (Soothe2-style). Soft is the current
+    // behaviour, so it is the default and existing presets are unchanged.
+    layout.add (std::make_unique<AudioParameterChoice> (
+        ParameterID { "mode", 1 }, "Mode", StringArray { "Soft", "Hard" }, 0));
+
     for (int n = 0; n < kNumNodes; ++n)
     {
         const float defF = 80.0f * std::pow (16000.0f / 80.0f, (float) n / (float) (kNumNodes - 1));
@@ -83,6 +90,7 @@ ResonanceSuppressorAudioProcessor::ResonanceSuppressorAudioProcessor()
     deltaParam  = apvts.getRawParameterValue ("delta");
     linkParam   = apvts.getRawParameterValue ("link");
     bypassParam = apvts.getRawParameterValue ("bypass");
+    modeParam   = apvts.getRawParameterValue ("mode");
 
     for (int n = 0; n < kNumNodes; ++n)
     {
@@ -174,6 +182,7 @@ void ResonanceSuppressorAudioProcessor::processBlock (juce::AudioBuffer<float>& 
     suppressor.setMix       ((double) mixParam->load() / 100.0);
     suppressor.setDelta     (deltaParam->load() > 0.5f);
     suppressor.setStereoLink (linkParam->load() > 0.5f);
+    suppressor.setMode      ((int) modeParam->load());
     rasterizeProfile();
 
     const int numSamples = buffer.getNumSamples();

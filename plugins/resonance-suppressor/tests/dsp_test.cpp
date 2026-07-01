@@ -17,6 +17,12 @@
 //      analysis-window length within bounds at every supported rate (incl.
 //      192 kHz), so the low end of the spectrum is never lost. This is the guard
 //      against a fixed FFT order silently degrading at high sample rates.
+//   8. Detection mode. Soft (adaptive threshold) is level-independent: the same
+//      resonance is cut by the same dB at 0 dB and −12 dB. Hard (absolute
+//      threshold set by Depth) is level-dependent: a resonance is cut hard when
+//      loud and left alone when quiet. Hard stays selective (resonance cut, not
+//      broadband) and numerically safe (finite / non-increasing) at worst-case
+//      Depth. Delta and the silence floor are re-checked in both modes.
 //
 // Every test runs across the full standard sample-rate matrix
 // (44.1 / 48 / 88.2 / 96 / 176.4 / 192 kHz) and prepares the engine at the same
@@ -26,6 +32,7 @@
 #include "factory_core/FFT.h"
 #include "factory_core/ResonanceSuppressor.h"
 #include "factory_core/StftResolution.h"
+#include "factory_core/testing/DspInvariants.h"
 
 #include <cmath>
 #include <complex>
@@ -134,9 +141,9 @@ namespace
         std::printf ("  maxErr=%.2e\n", e);
     }
 
-    void deltaTest (double Fs)
+    void deltaTest (double Fs, int mode)
     {
-        std::printf ("Delta (wet + removed == dry) @ Fs=%.0f\n", Fs);
+        std::printf ("Delta (wet + removed == dry) mode=%d @ Fs=%.0f\n", mode, Fs);
         const int N = 1 << orderFor (Fs);
         const int M = std::max (1 << 14, 4 * N);
         std::mt19937 rng (11);
@@ -144,11 +151,11 @@ namespace
         std::vector<double> x ((size_t) M);
         for (int n = 0; n < M; ++n) x[(size_t) n] = g (rng) + 0.5 * std::sin (2.0 * kPi * 1500.0 * n / Fs);
 
-        const auto wet = render (Fs, x, x, [] (factory_core::ResonanceSuppressor& s) {
-            s.setDepth (1.0); s.setMix (1.0);
+        const auto wet = render (Fs, x, x, [mode] (factory_core::ResonanceSuppressor& s) {
+            s.setMode (mode); s.setDepth (1.0); s.setMix (1.0);
         });
-        const auto rem = render (Fs, x, x, [] (factory_core::ResonanceSuppressor& s) {
-            s.setDepth (1.0); s.setDelta (true);
+        const auto rem = render (Fs, x, x, [mode] (factory_core::ResonanceSuppressor& s) {
+            s.setMode (mode); s.setDepth (1.0); s.setDelta (true);
         });
         double e = 0.0;
         for (int n = 2 * N; n < M; ++n) e = std::max (e, std::abs (wet[(size_t) n] + rem[(size_t) n] - x[(size_t) (n - N)]));
@@ -256,9 +263,9 @@ namespace
     // gain reduction. A purely relative peak-vs-envelope detector would paint a
     // phantom reduction "curtain" on it; the absolute floor must keep the engine
     // idle so silence stays silent on the display and in the audio.
-    void silenceTest (double Fs)
+    void silenceTest (double Fs, int mode)
     {
-        std::printf ("Silence floor (no reduction on near-silent input) @ Fs=%.0f\n", Fs);
+        std::printf ("Silence floor (no reduction on near-silent input) mode=%d @ Fs=%.0f\n", mode, Fs);
         const int M = 1 << 15;
         const double amp = 1.0e-5; // ~ -100 dBFS peaks — inaudible
         std::mt19937 rng (13);
@@ -270,7 +277,7 @@ namespace
                           + amp * std::sin (2.0 * kPi * 800.0 * n / Fs);
 
         factory_core::ResonanceSuppressor s; s.prepare (Fs, orderFor (Fs));
-        s.setDepth (1.5); s.setSharpness (0.5);
+        s.setMode (mode); s.setDepth (1.5); s.setSharpness (0.5);
         for (int n = 0; n < M; ++n) { double l = x[(size_t) n], r = l; s.process (l, r); }
 
         const double* red = s.reductionDb();
@@ -278,7 +285,7 @@ namespace
         for (int k = 0; k < s.numBins(); ++k) worst = std::min (worst, red[(size_t) k]);
         if (worst < -0.5)
             fail ("phantom reduction on near-silent input: " + std::to_string (worst)
-                  + " dB at Fs=" + std::to_string (Fs));
+                  + " dB (mode " + std::to_string (mode) + ") at Fs=" + std::to_string (Fs));
         std::printf ("  worstReduction=%.3f dB (expect ~0)\n", worst);
     }
 
@@ -306,6 +313,145 @@ namespace
 
         std::printf ("  order=%d binHz=%.2f winMs=%.1f\n", order, binHz, winMs);
     }
+
+    // Bin-aligned tone frequency near `f0` so windowed magnitude has no scalloping
+    // loss — the Hard-mode tests key off absolute dBFS, so the tone must land on a
+    // bin for the level threshold to be exercised precisely.
+    double alignedFreq (double Fs, double f0)
+    {
+        const int N = 1 << orderFor (Fs);
+        const int kf = std::max (1, (int) std::round (f0 * (double) N / Fs));
+        return (double) kf * Fs / (double) N;
+    }
+
+    // Measure the steady-state reduction (dB) of a resonance at `f0` for a given
+    // mode/depth and input scale, via an independent single-bin DFT (magAt).
+    double resonanceReductionDb (double Fs, double f0, int mode, double depth, double scale)
+    {
+        const int M = 1 << 15;
+        std::mt19937 rng (5);
+        std::normal_distribution<double> g (0.0, 0.1);
+        std::vector<double> x ((size_t) M);
+        for (int n = 0; n < M; ++n)
+            x[(size_t) n] = scale * (g (rng) + 0.5 * std::sin (2.0 * kPi * f0 * n / Fs));
+
+        const auto dry = render (Fs, x, x, [] (factory_core::ResonanceSuppressor& s) { s.setDepth (0.0); });
+        const auto wet = render (Fs, x, x, [mode, depth] (factory_core::ResonanceSuppressor& s) {
+            s.setMode (mode); s.setDepth (depth); s.setSharpness (0.5);
+        });
+        const int a = M / 2, b = M;
+        return 20.0 * std::log10 (magAt (wet, a, b, f0, Fs) / magAt (dry, a, b, f0, Fs));
+    }
+
+    // Soft mode uses an adaptive threshold, so its reduction is invariant to input
+    // level: the SAME resonance is cut by the SAME dB whether the signal is at
+    // 0 dB or −12 dB. This is the defining property of the frequency-dependent
+    // (Soft) mode — assert it directly, with no oracle (issue #34 style: the
+    // property itself is the gate, measured through the real DSP).
+    void softLevelInvarianceTest (double Fs)
+    {
+        std::printf ("Soft mode level invariance @ Fs=%.0f\n", Fs);
+        const double f0 = alignedFreq (Fs, 2000.0);
+        const double loud = resonanceReductionDb (Fs, f0, 0, 1.2, 1.0);   // hot
+        const double quiet = resonanceReductionDb (Fs, f0, 0, 1.2, 0.25);  // −12 dB
+        if (loud > -4.0)
+            fail ("Soft: resonance not suppressed at 0 dB: " + std::to_string (loud) + " dB");
+        if (std::abs (loud - quiet) > 0.5)
+            fail ("Soft mode not level-invariant: loud " + std::to_string (loud)
+                  + " dB vs quiet " + std::to_string (quiet) + " dB at Fs=" + std::to_string (Fs));
+        std::printf ("  redF0 loud=%.2f dB  quiet=%.2f dB (expect ~equal)\n", loud, quiet);
+    }
+
+    // Hard mode reacts to absolute level: Depth sets an absolute threshold, so the
+    // same resonance is cut hard when it sits above the threshold (loud) and left
+    // essentially alone when it drops below it (quiet). This is the defining
+    // property of the level-dependent (Hard) mode. Depth ~0.28 puts the threshold
+    // near −16 dBFS, between the loud (−6 dBFS) and quiet (−26 dBFS) resonance.
+    void hardLevelDependenceTest (double Fs)
+    {
+        std::printf ("Hard mode level dependence @ Fs=%.0f\n", Fs);
+        const double f0 = alignedFreq (Fs, 2000.0);
+        const double loud  = resonanceReductionDb (Fs, f0, 1, 0.28, 1.0);  // −6 dBFS peak
+        const double quiet = resonanceReductionDb (Fs, f0, 1, 0.28, 0.1);  // −26 dBFS peak
+        if (loud > -4.0)
+            fail ("Hard: loud resonance not suppressed: " + std::to_string (loud) + " dB");
+        if (quiet < -1.5)
+            fail ("Hard: quiet resonance should be nearly untouched: " + std::to_string (quiet) + " dB");
+        if (quiet - loud < 4.0)
+            fail ("Hard mode not level-dependent: loud " + std::to_string (loud)
+                  + " dB vs quiet " + std::to_string (quiet) + " dB at Fs=" + std::to_string (Fs));
+        std::printf ("  redF0 loud=%.2f dB  quiet=%.2f dB (expect loud << quiet)\n", loud, quiet);
+    }
+
+    // Hard mode must still be a *resonance* suppressor, not a broadband gate: a hot
+    // resonance is cut hard while a resonance-free control band is left broadly
+    // intact (selectivity), measured with an independent DFT.
+    void hardSuppressionTest (double Fs)
+    {
+        std::printf ("Hard suppression + selectivity @ Fs=%.0f\n", Fs);
+        const int M = 1 << 15;
+        const double f0 = alignedFreq (Fs, 2000.0);
+        std::mt19937 rng (5);
+        std::normal_distribution<double> g (0.0, 0.1);
+        std::vector<double> x ((size_t) M);
+        for (int n = 0; n < M; ++n) x[(size_t) n] = g (rng) + 0.5 * std::sin (2.0 * kPi * f0 * n / Fs);
+
+        const auto dry = render (Fs, x, x, [] (factory_core::ResonanceSuppressor& s) { s.setDepth (0.0); });
+        const auto wet = render (Fs, x, x, [] (factory_core::ResonanceSuppressor& s) {
+            s.setMode (1); s.setDepth (0.8); s.setSharpness (0.5);
+        });
+
+        const int a = M / 2, b = M;
+        const double f0Db = 20.0 * std::log10 (magAt (wet, a, b, f0, Fs) / magAt (dry, a, b, f0, Fs));
+        double dryCtrlE = 0.0, wetCtrlE = 0.0;
+        for (double fc : { 4000.0, 5000.0, 6000.0, 7000.0, 8000.0, 9000.0, 10000.0 })
+        {
+            const double d = magAt (dry, a, b, fc, Fs), w = magAt (wet, a, b, fc, Fs);
+            dryCtrlE += d * d; wetCtrlE += w * w;
+        }
+        const double ctrlDb = 10.0 * std::log10 (wetCtrlE / (dryCtrlE + 1e-30));
+        if (f0Db > -6.0)
+            fail ("Hard: resonance at f0 not suppressed (>=6 dB): " + std::to_string (f0Db) + " dB");
+        if (ctrlDb < -4.5)
+            fail ("Hard: control band over-attenuated (not selective): " + std::to_string (ctrlDb) + " dB");
+        if (f0Db > ctrlDb - 15.0)
+            fail ("Hard: not selective: f0 " + std::to_string (f0Db) + " dB vs control " + std::to_string (ctrlDb) + " dB");
+        std::printf ("  f0 %.1f dB   control %.1f dB (broadband)\n", f0Db, ctrlDb);
+    }
+
+    // Hard mode is feed-forward (no feedback loop), but assert it anyway at the
+    // worst-case Depth across all rates: the impulse-response tail must not grow
+    // (loop gain < 1) and a long hot hold must stay finite and bounded (no NaN /
+    // runaway), per the regression-policy numeric-safety invariants.
+    void hardStabilityTest (double Fs)
+    {
+        std::printf ("Hard mode stability (finite / non-increasing) @ Fs=%.0f\n", Fs);
+        factory_core::ResonanceSuppressor s; s.prepare (Fs, orderFor (Fs));
+        s.setMode (1); s.setDepth (1.5); s.setSharpness (0.5); s.setMix (1.0);
+        auto proc = [&s] (double in) { double l = in, r = in; s.process (l, r); return l; };
+        if (! factory_core::testing::impulseResponseNonIncreasing (proc, Fs, 4.0, 0.25, 1.05))
+            fail ("Hard mode impulse response grew (loop gain >= 1) at Fs=" + std::to_string (Fs));
+
+        // Long hot noise hold: output must stay finite and bounded (a suppressor
+        // only attenuates, so a realistic ceiling — not a 1e6 not-NaN tolerance).
+        factory_core::ResonanceSuppressor s2; s2.prepare (Fs, orderFor (Fs));
+        s2.setMode (1); s2.setDepth (1.5); s2.setSharpness (0.5); s2.setMix (1.0);
+        const int M = (int) (2.0 * Fs);
+        std::mt19937 rng (23);
+        std::normal_distribution<double> g (0.0, 0.5);
+        std::vector<double> y ((size_t) M);
+        for (int n = 0; n < M; ++n) { double l = g (rng), r = l; s2.process (l, r); y[(size_t) n] = l; }
+        if (! factory_core::testing::allFinite (y))
+            fail ("Hard mode produced non-finite output at Fs=" + std::to_string (Fs));
+        if (factory_core::testing::peakAbs (y) > 4.0)
+            fail ("Hard mode output exceeded realistic bound: "
+                  + std::to_string (factory_core::testing::peakAbs (y)) + " at Fs=" + std::to_string (Fs));
+
+        // Resolution-follows-rate holds for the mode path too (independent of mode).
+        if (! factory_core::testing::resolutionFollowsSampleRate (Fs, 25.0, 0.030))
+            fail ("resolution out of range at Fs=" + std::to_string (Fs));
+        std::printf ("  ok (peak=%.3f)\n", factory_core::testing::peakAbs (y));
+    }
 }
 
 int main (int argc, char** argv)
@@ -320,12 +466,18 @@ int main (int argc, char** argv)
     for (double Fs : rates)
     {
         reconstructionTest (Fs);
-        deltaTest (Fs);
+        deltaTest (Fs, 0);   // Soft
+        deltaTest (Fs, 1);   // Hard
         suppressionTest (Fs);
         profileTest (Fs);
         stereoLinkTest (Fs);
-        silenceTest (Fs);
+        silenceTest (Fs, 0); // Soft
+        silenceTest (Fs, 1); // Hard
         resolutionTest (Fs);
+        softLevelInvarianceTest (Fs);
+        hardLevelDependenceTest (Fs);
+        hardSuppressionTest (Fs);
+        hardStabilityTest (Fs);
     }
 
     if (g_failures == 0) { std::printf ("OK: all checks passed.\n"); return 0; }

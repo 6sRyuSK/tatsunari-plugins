@@ -89,6 +89,9 @@ namespace factory_core
         void setMix       (double m)   noexcept { mix = std::clamp (m, 0.0, 1.0); }
         void setDelta     (bool b)     noexcept { delta = b; }
         void setStereoLink (bool b)    noexcept { link = b; }
+        // Detection mode: 0 = Soft (adaptive threshold, level-independent),
+        // 1 = Hard (absolute level threshold, level-dependent). See computeGains.
+        void setMode      (int m)      noexcept { mode = std::clamp (m, 0, 1); }
 
         void setRange (double lowHz, double highHz) noexcept
         {
@@ -164,6 +167,14 @@ namespace factory_core
         // even though nothing audible is happening (issue #24). 0 dBFS here is a
         // full-scale sine, whose bin magnitude is N/4.
         static constexpr double kFloorDb = -80.0;
+        // Hard (level-dependent) mode: Depth doubles as the internal absolute
+        // threshold. Depth 0..1 sweeps the threshold from kHardThrHiDb (gentle,
+        // only the hottest peaks touched) down to kHardThrLoDb (aggressive, deep
+        // notches). Reduction is the absolute excess of a resonant peak over that
+        // threshold, so the engine reacts to absolute harmonic level (Soothe2
+        // "Hard"), unlike Soft's adaptive/relative threshold.
+        static constexpr double kHardThrHiDb = -6.0;
+        static constexpr double kHardThrLoDb = -60.0;
 
         static double coeff (double ms, double rate) noexcept
         {
@@ -199,11 +210,29 @@ namespace factory_core
                 // absolute floor keeps the engine idle on near-silent input.
                 if (k >= lowBin && k <= highBin && depth > 0.0 && mag[(size_t) k] > floorMag)
                 {
+                    // Relative prominence over the local envelope identifies a
+                    // genuine resonant peak in both modes (broadband / noisy
+                    // material sits within kThreshDb and is left alone).
                     const double exDb = 20.0 * std::log10 ((mag[(size_t) k] + 1.0e-12) / (env[(size_t) k] + 1.0e-12));
-                    // Only act on genuine peaks: ignore excess within a small
-                    // threshold so broadband / noisy material is left alone.
-                    const double over = std::max (0.0, exDb - kThreshDb);
-                    double redDb = -depth * profile[(size_t) k] * over;  // negative = cut
+                    double redDb = 0.0;
+                    if (mode == 0)
+                    {
+                        // Soft: adaptive threshold. Reduction scales with Depth and
+                        // the relative excess, so it is invariant to input level.
+                        const double over = std::max (0.0, exDb - kThreshDb);
+                        redDb = -depth * profile[(size_t) k] * over;  // negative = cut
+                    }
+                    else
+                    {
+                        // Hard: absolute threshold set by Depth. Reduction is the
+                        // peak's absolute level (dBFS, 0 dB = full-scale sine bin
+                        // = N/4) above that threshold, so it tracks input level.
+                        const double magDb = 20.0 * std::log10 ((mag[(size_t) k] + 1.0e-12) / (0.25 * (double) N));
+                        const double d     = std::clamp (depth / 1.5, 0.0, 1.0);
+                        const double thrDb = kHardThrHiDb + d * (kHardThrLoDb - kHardThrHiDb);
+                        if (exDb > kThreshDb)  // only suppress resonant peaks
+                            redDb = -profile[(size_t) k] * std::max (0.0, magDb - thrDb);
+                    }
                     redDb = std::max (redDb, -48.0);
                     target = std::pow (10.0, redDb / 20.0);
                 }
@@ -296,5 +325,6 @@ namespace factory_core
         double mix = 1.0;
         bool   delta = false;
         bool   link = true;
+        int    mode = 0; // 0 = Soft (adaptive), 1 = Hard (absolute level)
     };
 } // namespace factory_core

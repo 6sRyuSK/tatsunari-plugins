@@ -16,6 +16,16 @@ ResonanceSuppressorAudioProcessorEditor::ResonanceSuppressorAudioProcessorEditor
     addAndMakeVisible (linkB);
     addAndMakeVisible (bypassB);
 
+    // Detection mode selector. Items must be added manually (the attachment does
+    // not populate the box in this JUCE version — same pattern as the other
+    // plugins' combos); item IDs 1,2 map to parameter indices 0,1 (Soft, Hard).
+    modeBox.addItemList ({ "Soft", "Hard" }, 1);
+    modeBox.setJustificationType (juce::Justification::centred);
+    modeBox.setColour (juce::ComboBox::textColourId, FactoryLookAndFeel::text());
+    modeBox.setTooltip ("Soft: adaptive, level-independent.  Hard: absolute level (Depth = threshold).");
+    addAndMakeVisible (modeBox);
+    modeAtt = std::make_unique<CA> (processor.apvts, "mode", modeBox);
+
     addAndMakeVisible (curve);
 
     addKnob (depthS, depthL, "Depth",     " %",  "depth");
@@ -73,6 +83,9 @@ void ResonanceSuppressorAudioProcessorEditor::resized()
     linkB.setBounds (top.removeFromRight (82));
     top.removeFromRight (6);
     deltaB.setBounds (top.removeFromRight (86));
+    top.removeFromRight (10);
+    modeBox.setBounds (top.removeFromRight (104));
+    top.removeFromRight (10);
     titleLabel.setBounds (top);
 
     r.removeFromTop (10);

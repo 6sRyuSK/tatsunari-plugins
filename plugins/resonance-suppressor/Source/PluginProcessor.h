@@ -79,6 +79,7 @@ private:
     std::atomic<float>* deltaParam  = nullptr;
     std::atomic<float>* linkParam   = nullptr;
     std::atomic<float>* bypassParam = nullptr;
+    std::atomic<float>* modeParam   = nullptr;
 
     struct NodeParams { std::atomic<float>* on = nullptr; std::atomic<float>* freq = nullptr; std::atomic<float>* amt = nullptr; };
     std::array<NodeParams, kNumNodes> nodes;
