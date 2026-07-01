@@ -44,7 +44,7 @@ ResonanceSuppressorAudioProcessor::createParameterLayout()
 
     layout.add (std::make_unique<AudioParameterFloat> (
         ParameterID { "depth", 1 }, "Depth",
-        NormalisableRange<float> { 0.0f, 100.0f, 0.1f }, 50.0f,
+        NormalisableRange<float> { 0.0f, 100.0f, 0.1f }, 30.0f,
         AudioParameterFloatAttributes().withLabel (" %")));
 
     layout.add (std::make_unique<AudioParameterFloat> (
@@ -98,7 +98,7 @@ ResonanceSuppressorAudioProcessor::createParameterLayout()
         layout.add (std::make_unique<AudioParameterChoice> (ParameterID { cutPid (w, "slope"), 1 }, juce::String (cd.which) + " Slope", slopeChoices, 2)); // 24 dB/oct
     }
 
-    const float bandFreqs[kNumBands] = { 991.0f, 2500.0f, 5000.0f, 8000.0f };
+    const float bandFreqs[kNumBands] = { 1000.0f, 2500.0f, 5000.0f, 8000.0f };
     const float bandSens [kNumBands] = { 0.0f,   0.0f,    6.0f,    0.0f };
     for (int b = 0; b < kNumBands; ++b)
     {
