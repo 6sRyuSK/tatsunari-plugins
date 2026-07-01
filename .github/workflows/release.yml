@@ -254,11 +254,11 @@ jobs:
           done < commits.txt
 
           {
-            echo "## Changes in ${slug}"
-            [ -n "$prev" ] && echo "_Since ${prev}._" || echo "_Initial release._"
+            echo "## ${slug} の変更点"
+            [ -n "$prev" ] && echo "_${prev} からの変更_" || echo "_初回リリース_"
             echo
             if [ -z "${feats}${fixes}${others}" ]; then
-              echo "- No plugin-specific changes since the previous release."
+              echo "- 前回リリース以降、このプラグイン固有の変更はありません。"
             else
               [ -n "$feats" ]  && { echo "### 機能";   echo; printf '%s' "$feats";  echo; }
               [ -n "$fixes" ]  && { echo "### 修正";   echo; printf '%s' "$fixes";  echo; }
