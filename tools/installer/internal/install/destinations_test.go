@@ -36,18 +36,23 @@ func TestDestinationWindows(t *testing.T) {
 	t.Setenv("CommonProgramFiles", `C:\Program Files\Common Files`)
 	t.Setenv("LOCALAPPDATA", `C:\Users\tester\AppData\Local`)
 
+	// Normalize both separators: when this test runs on Linux CI, filepath.Join
+	// mixes the backslashes from the env vars with '/' joins, so compare on a
+	// separator-agnostic form.
+	norm := func(p string) string { return strings.ReplaceAll(filepath.ToSlash(p), `\`, "/") }
+
 	sys, err := Destination(model.OSWindows, model.FormatVST3, model.ScopeSystem)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(filepath.ToSlash(sys), "Common Files/VST3/tatsunari") {
+	if !strings.HasSuffix(norm(sys), "Common Files/VST3/tatsunari") {
 		t.Errorf("windows system dest = %q", sys)
 	}
 	usr, err := Destination(model.OSWindows, model.FormatVST3, model.ScopeUser)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(filepath.ToSlash(usr), "AppData/Local/Programs/Common/VST3") {
+	if !strings.HasSuffix(norm(usr), "AppData/Local/Programs/Common/VST3") {
 		t.Errorf("windows user dest = %q", usr)
 	}
 	if _, err := Destination(model.OSWindows, model.FormatAU, model.ScopeSystem); err == nil {
