@@ -16,12 +16,20 @@ ResonanceSuppressorAudioProcessorEditor::ResonanceSuppressorAudioProcessorEditor
     addAndMakeVisible (linkB);
     addAndMakeVisible (bypassB);
 
+    // Detection mode selector. Items must be added manually (the attachment does
+    // not populate the box in this JUCE version — same pattern as the other
+    // plugins' combos); item IDs 1,2 map to parameter indices 0,1 (Soft, Hard).
+    modeBox.addItemList ({ "Soft", "Hard" }, 1);
+    modeBox.setJustificationType (juce::Justification::centred);
+    modeBox.setColour (juce::ComboBox::textColourId, FactoryLookAndFeel::text());
+    modeBox.setTooltip ("Soft: adaptive, level-independent.  Hard: absolute level (Depth = threshold).");
+    addAndMakeVisible (modeBox);
+    modeAtt = std::make_unique<CA> (processor.apvts, "mode", modeBox);
+
     addAndMakeVisible (curve);
 
     addKnob (depthS, depthL, "Depth",     " %",  "depth");
     addKnob (sharpS, sharpL, "Sharpness", " %",  "sharpness");
-    addKnob (lowS,   lowL,   "Low",       " Hz", "lowfreq");
-    addKnob (highS,  highL,  "High",      " Hz", "highfreq");
     addKnob (atkS,   atkL,   "Attack",    " ms", "attack");
     addKnob (relS,   relL,   "Release",   " ms", "release");
     addKnob (mixS,   mixL,   "Mix",       " %",  "mix");
@@ -34,7 +42,7 @@ ResonanceSuppressorAudioProcessorEditor::ResonanceSuppressorAudioProcessorEditor
     setResizeLimits (640, 440, 1280, 900);
     if (auto* c = getConstrainer())
         c->setFixedAspectRatio (760.0 / 520.0);
-    setSize (760, 520);
+    setSize (912, 624); // default 20% larger than the 760x520 reference (same aspect)
 }
 
 ResonanceSuppressorAudioProcessorEditor::~ResonanceSuppressorAudioProcessorEditor()
@@ -73,17 +81,24 @@ void ResonanceSuppressorAudioProcessorEditor::resized()
     linkB.setBounds (top.removeFromRight (82));
     top.removeFromRight (6);
     deltaB.setBounds (top.removeFromRight (86));
+    top.removeFromRight (10);
+    modeBox.setBounds (top.removeFromRight (104));
+    top.removeFromRight (10);
     titleLabel.setBounds (top);
 
     r.removeFromTop (10);
-    auto knobs = r.removeFromBottom (104);
+    // Bottom control row at ~80% of its former height so the analyser gets the
+    // extra vertical space. The row is centred horizontally so the smaller knobs
+    // don't stretch edge-to-edge.
+    auto knobs = r.removeFromBottom (83);
     r.removeFromBottom (12);
     curve.setBounds (r);
 
-    juce::Slider* sl[] = { &depthS, &sharpS, &lowS, &highS, &atkS, &relS, &mixS };
-    juce::Label*  lb[] = { &depthL, &sharpL, &lowL, &highL, &atkL, &relL, &mixL };
+    juce::Slider* sl[] = { &depthS, &sharpS, &atkS, &relS, &mixS };
+    juce::Label*  lb[] = { &depthL, &sharpL, &atkL, &relL, &mixL };
     const int n = (int) std::size (sl);
-    const int cw = knobs.getWidth() / n;
+    const int cw = juce::jmin (96, knobs.getWidth() / n);
+    knobs = knobs.withSizeKeepingCentre (cw * n, knobs.getHeight());
     for (int i = 0; i < n; ++i)
     {
         auto cell = (i == n - 1) ? knobs : knobs.removeFromLeft (cw);
