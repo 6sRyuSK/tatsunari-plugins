@@ -23,7 +23,7 @@ private:
     using ButtonAttachment   = juce::AudioProcessorValueTreeState::ButtonAttachment;
     using ComboBoxAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
-    void addKnob (const char* id, const char* name, const char* suffix);
+    void addKnob (const char* id, const char* name, const char* suffix, int decimals);
     void setupPitchBox (juce::ComboBox&, juce::Label&, const char* name);
 
     ShimmerReverbAudioProcessor& processor;

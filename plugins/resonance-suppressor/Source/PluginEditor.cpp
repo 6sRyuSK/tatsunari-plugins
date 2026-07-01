@@ -58,9 +58,10 @@ void ResonanceSuppressorAudioProcessorEditor::addKnob (juce::Slider& s, juce::La
     addAndMakeVisible (s);
     addAndMakeVisible (l);
     knobAtts.push_back (std::make_unique<SA> (processor.apvts, id, s));
-    // Freq reads as integer Hz; everything else to 2 dp. Must run after the
+    // % and frequency read as integers; dB / ms to 2 dp. Must run after the
     // attachment, which otherwise formats with up to 7 decimals (see #23).
-    factory_ui::setSliderDecimals (s, id.containsIgnoreCase ("freq") ? 0 : 2);
+    const bool integer = suffix.containsIgnoreCase ("%") || suffix.containsIgnoreCase ("Hz");
+    factory_ui::setSliderDecimals (s, integer ? 0 : 2);
 }
 
 void ResonanceSuppressorAudioProcessorEditor::paint (juce::Graphics& g)

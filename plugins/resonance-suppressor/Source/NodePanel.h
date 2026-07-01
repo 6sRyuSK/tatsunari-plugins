@@ -86,7 +86,7 @@ public:
         };
         freqSlider.setTextValueSuffix ({}); // the lambda already prints Hz/kHz — avoid a doubled suffix
         freqSlider.updateText();
-        if (! isCut) factory_ui::setSliderDecimals (sensSlider, 1);
+        if (! isCut) factory_ui::setSliderDecimals (sensSlider, 2); // dB to 2 dp
 
         resized();
         repaint();

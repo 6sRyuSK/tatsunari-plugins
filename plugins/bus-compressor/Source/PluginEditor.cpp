@@ -42,10 +42,12 @@ BusCompressorAudioProcessorEditor::BusCompressorAudioProcessorEditor (BusCompres
     ratioAtt  = std::make_unique<ComboBoxAttachment> (s, "ratio",     ratioBox);
     bypassAtt = std::make_unique<ButtonAttachment>   (s, "bypass",    bypassButton);
 
-    // Continuous (skewed) params otherwise show 7 decimals; cap to 2.
-    for (auto* sl : { &thresholdSlider, &attackSlider, &releaseSlider, &makeupSlider, &mixSlider })
-        if (sl->getInterval() == 0.0)
-            sl->setNumDecimalPlacesToDisplay (2);
+    // Pin the text-box precision. Must run after the attachments above, which
+    // otherwise format continuous ranges with up to 7 decimals (see #23). dB / ms
+    // to 2 dp; % as an integer.
+    for (auto* sl : { &thresholdSlider, &attackSlider, &releaseSlider, &makeupSlider })
+        factory_ui::setSliderDecimals (*sl, 2);
+    factory_ui::setSliderDecimals (mixSlider, 0);
 
     setSize (580, 340);
 }
