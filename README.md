@@ -43,6 +43,7 @@ bundles into your plugin folders:
 - **AU** (`.component`) → `~/Library/Audio/Plug-Ins/Components/` (or `/Library/...` for all users)
 - **VST3** (`.vst3`) → `~/Library/Audio/Plug-Ins/VST3/` (or `/Library/...`)
 
+<!-- BEGIN:INSTALL -->
 ### curl でインストール
 
 The commands below install the **everything bundle** (all plugins) for **all
@@ -74,6 +75,7 @@ DAW and rescan afterwards.
 The bundles are **not code-signed or notarized**, but each release ships a
 build-provenance attestation (`gh attestation verify`) and `SHA256SUMS.txt` — see
 the release notes to verify a download before trusting it.
+<!-- END:INSTALL -->
 
 ### macOS: "「…」は壊れているため開けません" / "…is damaged and can't be opened"
 
