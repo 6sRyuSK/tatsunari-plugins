@@ -1,0 +1,129 @@
+name: Release
+
+# Build the plugins and attach them to a GitHub Release.
+#
+# Triggered by pushing a version tag (e.g. `v1.2.3`). Builds on macOS and
+# Windows, packages each OS's plugins into a zip, and uploads them as assets
+# on the Release for that tag:
+#   - macOS:   VST3 + AU  -> tatsunari-plugins-<tag>-macOS.zip
+#   - Windows: VST3       -> tatsunari-plugins-<tag>-Windows.zip
+#
+# The build setup mirrors ci.yml (Ninja + compiler cache) so it stays in sync.
+# `workflow_dispatch` builds the same artifacts for inspection but does not
+# publish a Release (there is no tag to attach to).
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS,   os: macos-latest,   ccache: ccache }
+          - { name: Windows, os: windows-latest, ccache: sccache }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # A stable name for the release assets: the tag on a tag push, otherwise
+      # a short-SHA dev name so `workflow_dispatch` runs still produce zips.
+      - name: Compute version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "version=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Set up MSVC + Ninja (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja -y
+
+      - name: Compiler cache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: release-${{ matrix.os }}
+          variant: ${{ matrix.ccache }}
+          max-size: 1500M
+
+      - name: Configure
+        run: >
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=${{ matrix.ccache }}
+          -DCMAKE_CXX_COMPILER_LAUNCHER=${{ matrix.ccache }}
+
+      - name: Build
+        run: cmake --build build
+
+      # ---- package -----------------------------------------------------------
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          stage="tatsunari-plugins-${{ steps.ver.outputs.version }}-macOS"
+          mkdir -p dist "$stage"
+          while IFS= read -r p; do
+            cp -R "$p" "$stage/"
+          done < <(find build \( -type d -path '*/VST3/*.vst3' -o -type d -path '*/AU/*.component' \))
+          ( cd "$stage" && zip -r "../dist/${stage}.zip" . )
+          ls -la dist
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $stage = "tatsunari-plugins-${{ steps.ver.outputs.version }}-Windows"
+          New-Item -ItemType Directory -Force dist, $stage | Out-Null
+          Get-ChildItem build -Recurse -Directory -Filter *.vst3 |
+            Where-Object { $_.FullName -match '[\\/]VST3[\\/]' } |
+            ForEach-Object { Copy-Item -Recurse $_.FullName $stage }
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/$stage.zip" -Force
+          Get-ChildItem dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugins-${{ matrix.name }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # required to create the Release and upload assets
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          draft: false
+          generate_release_notes: true
