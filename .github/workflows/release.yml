@@ -331,6 +331,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write        # OIDC for keyless build-provenance attestation
+      attestations: write    # publish the attestation to the transparency log
     steps:
       - uses: actions/checkout@v4
         with:
@@ -352,6 +354,18 @@ jobs:
           # change detection and carry-over).
           jq -c 'map({(.slug): .version}) | add' <<<"$PLUGINS" > dist/manifest.json
           cat dist/manifest.json
+
+      # SHA256SUMS.txt over every published asset. Two independent trust anchors
+      # back these digests: they are embedded in the release notes (tied to the
+      # immutable git tag) AND each zip carries a keyless build-provenance
+      # attestation (next step). Users verify with `shasum -a 256 -c` and/or
+      # `gh attestation verify`. NOT a substitute for notarization — the bundles
+      # remain unsigned, so macOS still quarantines them (see README).
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          ( cd dist && sha256sum *.zip manifest.json | sort -k2 > SHA256SUMS.txt )
+          cat dist/SHA256SUMS.txt
 
       # Release notes: one entry per CHANGED plugin listing its commits since the
       # previous release, grouped by conventional-commit prefix (feat -> fix ->
@@ -410,10 +424,30 @@ jobs:
               fv = vus(p['version'])
               L.append(f"| {p['name']} v{p['version']} | [AU]({base}/{p['slug']}-{fv}-macOS-AU.zip) | [VST3]({base}/{p['slug']}-{fv}-macOS-VST3.zip) | [VST3]({base}/{p['slug']}-{fv}-Windows.zip) |")
 
+          # 検証: git タグに紐づくこのノート内の SHA-256 が、gitで固定された
+          # 信頼の起点。各 zip はビルドプロヴェナンス attestation も付帯する。
+          # （いずれも公証の代替ではない — バンドルは未署名のまま。）
+          repo = os.environ['GITHUB_REPOSITORY']
+          sums = open("dist/SHA256SUMS.txt").read().strip()
+          L += ["", "### 検証", "",
+                f"各 zip はビルドプロヴェナンス attestation 付き。CI 由来を暗号検証:",
+                "", "```", f"gh attestation verify <zip> --repo {repo}", "```", "",
+                "`SHA256SUMS.txt` をダウンロードして完全性を照合 "
+                "(`shasum -a 256 -c SHA256SUMS.txt` / `sha256sum -c`)。以下と一致する:",
+                "", "```", sums, "```"]
+
           with open("notes.md", "w") as f:
               f.write("\n".join(L) + "\n")
           print(open("notes.md").read())
           PY
+
+      # Keyless (OIDC) build-provenance attestation over every published zip,
+      # recorded in the public Sigstore transparency log. Free for public repos;
+      # verified by users with `gh attestation verify <zip> --repo <owner/repo>`.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'dist/*.zip'
 
       - name: Publish
         uses: softprops/action-gh-release@v2
@@ -423,5 +457,6 @@ jobs:
           files: |
             dist/*.zip
             dist/manifest.json
+            dist/SHA256SUMS.txt
           draft: false
           body_path: notes.md
