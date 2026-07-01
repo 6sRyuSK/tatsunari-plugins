@@ -45,53 +45,43 @@ bundles into your plugin folders:
 
 ### curl で最新版をインストール
 
-Asset filenames embed the release version, so instead of hard-coding a URL the
-snippets below ask the GitHub API for the **latest** release and download from
-there (only `curl` and `unzip` — no `jq`). Downloading with `curl` also skips the
+The snippets below install the **everything bundle** (all plugins). Asset
+filenames embed the release version, so instead of hard-coding a URL each snippet
+asks the GitHub API for the **latest** release and downloads from there (only
+`curl` and `unzip` — no `jq`). Downloading with `curl` also skips the
 `com.apple.quarantine` flag a browser attaches, so the macOS "damaged" prompt
-below does **not** appear.
+below does **not** appear. Restart your DAW and rescan afterwards.
 
-#### macOS — everything bundle (AU + VST3, all plugins)
-
-    REPO=6sRyuSK/tatsunari-plugins
-    curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-      | grep -oE '"browser_download_url": *"[^"]*macOS-(AU|VST3)\.zip"' \
-      | cut -d'"' -f4 \
-      | while read -r url; do
-          case "$url" in
-            *macOS-AU.zip)   dest="$HOME/Library/Audio/Plug-Ins/Components" ;;
-            *macOS-VST3.zip) dest="$HOME/Library/Audio/Plug-Ins/VST3" ;;
-          esac
-          mkdir -p "$dest"
-          curl -fL "$url" -o /tmp/tp-bundle.zip
-          unzip -o /tmp/tp-bundle.zip -d "$dest" && rm -f /tmp/tp-bundle.zip
-        done
-
-Swap `macOS-(AU|VST3)\.zip` for `Windows\.zip` (and pick your VST3 folder, e.g.
-`%CommonProgramFiles%\VST3`) to grab the Windows bundle instead.
-
-#### macOS — a single plugin
-
-Filter to one plugin's zips by its slug (`resonance-suppressor`,
-`dynamic-parametric-eq`, … — the `plugins/<slug>` folder name):
+#### macOS — AU (`.component`)
 
     REPO=6sRyuSK/tatsunari-plugins
-    SLUG=resonance-suppressor
-    curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-      | grep -oE "\"browser_download_url\": *\"[^\"]*${SLUG}-[^\"]*macOS-(AU|VST3)\\.zip\"" \
-      | cut -d'"' -f4 \
-      | while read -r url; do
-          case "$url" in
-            *macOS-AU.zip)   dest="$HOME/Library/Audio/Plug-Ins/Components" ;;
-            *macOS-VST3.zip) dest="$HOME/Library/Audio/Plug-Ins/VST3" ;;
-          esac
-          mkdir -p "$dest"
-          curl -fL "$url" -o /tmp/tp-plugin.zip
-          unzip -o /tmp/tp-plugin.zip -d "$dest" && rm -f /tmp/tp-plugin.zip
-        done
+    url=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+          | grep -oE '"browser_download_url": *"[^"]*macOS-AU\.zip"' | cut -d'"' -f4)
+    dest="$HOME/Library/Audio/Plug-Ins/Components"
+    mkdir -p "$dest"
+    curl -fL "$url" -o /tmp/tp-au.zip && unzip -o /tmp/tp-au.zip -d "$dest" && rm -f /tmp/tp-au.zip
+    killall -9 AudioComponentRegistrar 2>/dev/null   # force an AU rescan
 
-Then restart your DAW and rescan (for AU you may also need
-`killall -9 AudioComponentRegistrar`).
+#### macOS — VST3 (`.vst3`)
+
+    REPO=6sRyuSK/tatsunari-plugins
+    url=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+          | grep -oE '"browser_download_url": *"[^"]*macOS-VST3\.zip"' | cut -d'"' -f4)
+    dest="$HOME/Library/Audio/Plug-Ins/VST3"
+    mkdir -p "$dest"
+    curl -fL "$url" -o /tmp/tp-vst3.zip && unzip -o /tmp/tp-vst3.zip -d "$dest" && rm -f /tmp/tp-vst3.zip
+
+#### Windows — VST3 (`.vst3`, PowerShell)
+
+    $repo = "6sRyuSK/tatsunari-plugins"
+    $url  = (Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest").assets |
+            Where-Object { $_.name -like "*-Windows.zip" } |
+            Select-Object -ExpandProperty browser_download_url
+    $dest = "$Env:CommonProgramFiles\VST3"
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Invoke-WebRequest $url -OutFile "$Env:TEMP\tp-win.zip"
+    Expand-Archive "$Env:TEMP\tp-win.zip" -DestinationPath $dest -Force
+    Remove-Item "$Env:TEMP\tp-win.zip"
 
 ### macOS: "「…」は壊れているため開けません" / "…is damaged and can't be opened"
 
