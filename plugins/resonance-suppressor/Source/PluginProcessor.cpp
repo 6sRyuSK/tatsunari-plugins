@@ -95,7 +95,9 @@ ResonanceSuppressorAudioProcessor::ResonanceSuppressorAudioProcessor()
 void ResonanceSuppressorAudioProcessor::prepareToPlay (double sampleRate, int)
 {
     currentSampleRate = sampleRate;
-    suppressor.prepare (sampleRate, kFftOrder);
+    currentFftOrder   = factory_core::fftOrderForSampleRate (sampleRate, kBaseFftOrder, kRefSampleRate, kMaxFftOrder);
+    activeBins        = (1 << currentFftOrder) / 2 + 1;
+    suppressor.prepare (sampleRate, currentFftOrder);
     setLatencySamples (suppressor.latencySamples());
     for (auto& a : pubMag) a.store (-120.0f, std::memory_order_relaxed);
     for (auto& a : pubRed) a.store (0.0f, std::memory_order_relaxed);
@@ -112,10 +114,10 @@ bool ResonanceSuppressorAudioProcessor::isBusesLayoutSupported (const BusesLayou
 void ResonanceSuppressorAudioProcessor::rasterizeProfile()
 {
     const double sr = currentSampleRate;
-    const int N = 1 << kFftOrder;
+    const int N = 1 << currentFftOrder;
     constexpr double sigma = 0.30; // gaussian half-width in natural-log frequency
 
-    for (int k = 0; k < kNumBins; ++k) profileBuf[(size_t) k] = 1.0;
+    for (int k = 0; k < activeBins; ++k) profileBuf[(size_t) k] = 1.0;
 
     for (int n = 0; n < kNumNodes; ++n)
     {
@@ -123,17 +125,17 @@ void ResonanceSuppressorAudioProcessor::rasterizeProfile()
         const double f0 = nodes[(size_t) n].freq->load();
         const double a  = nodes[(size_t) n].amt->load();
         const double lf0 = std::log (juce::jmax (10.0, f0));
-        for (int k = 1; k < kNumBins; ++k)
+        for (int k = 1; k < activeBins; ++k)
         {
             const double f = (double) k * sr / N;
             const double d = (std::log (juce::jmax (10.0, f)) - lf0) / sigma;
             profileBuf[(size_t) k] += a * std::exp (-0.5 * d * d);
         }
     }
-    for (int k = 0; k < kNumBins; ++k)
+    for (int k = 0; k < activeBins; ++k)
         profileBuf[(size_t) k] = juce::jlimit (0.0, 4.0, profileBuf[(size_t) k]);
 
-    suppressor.setProfile (profileBuf.data(), kNumBins);
+    suppressor.setProfile (profileBuf.data(), activeBins);
 }
 
 void ResonanceSuppressorAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -171,11 +173,11 @@ void ResonanceSuppressorAudioProcessor::processBlock (juce::AudioBuffer<float>& 
         if (R != nullptr) R[i] = (float) r;
     }
 
-    // Publish the latest display spectra for the editor.
-    std::array<double, kNumBins> scratch;
-    const double* magDb = suppressor.magnitudeDb (scratch.data());
+    // Publish the latest display spectra for the editor. magScratch is
+    // preallocated (sized for the top order) to keep processBlock allocation-free.
+    const double* magDb = suppressor.magnitudeDb (magScratch.data());
     const double* redDb = suppressor.reductionDb();
-    for (int k = 0; k < kNumBins; ++k)
+    for (int k = 0; k < activeBins; ++k)
     {
         pubMag[(size_t) k].store ((float) magDb[k], std::memory_order_relaxed);
         pubRed[(size_t) k].store ((float) redDb[k], std::memory_order_relaxed);

@@ -3,6 +3,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include "factory_core/ResonanceSuppressor.h"
+#include "factory_core/StftResolution.h"
 
 #include <array>
 #include <atomic>
@@ -18,9 +19,15 @@
 class ResonanceSuppressorAudioProcessor final : public juce::AudioProcessor
 {
 public:
-    static constexpr int kFftOrder = 11;
-    static constexpr int kNumBins  = (1 << kFftOrder) / 2 + 1; // 1025
-    static constexpr int kNumNodes = 6;
+    // The STFT order tracks the sample rate so the analyser resolution and the
+    // suppressor's detection window stay constant in Hz / seconds (see
+    // factory_core::fftOrderForSampleRate). Buffers are sized for the top order;
+    // `activeBins` is the live bin count for the current sample rate.
+    static constexpr int    kBaseFftOrder  = 11;        // N = 2048 at the 48 kHz reference
+    static constexpr int    kMaxFftOrder   = 13;        // N = 8192, keeps ~23 Hz bins through 192 kHz
+    static constexpr double kRefSampleRate = 48000.0;
+    static constexpr int    kMaxBins       = (1 << kMaxFftOrder) / 2 + 1; // 4097
+    static constexpr int    kNumNodes      = 6;
 
     ResonanceSuppressorAudioProcessor();
     ~ResonanceSuppressorAudioProcessor() override = default;
@@ -56,7 +63,7 @@ public:
     // Editor display snapshots (GUI thread reads; lock-free).
     float displayMagDb (int bin) const noexcept { return pubMag[(size_t) bin].load (std::memory_order_relaxed); }
     float displayRedDb (int bin) const noexcept { return pubRed[(size_t) bin].load (std::memory_order_relaxed); }
-    int   binsForDisplay() const noexcept { return kNumBins; }
+    int   binsForDisplay() const noexcept { return activeBins; }
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
@@ -77,11 +84,14 @@ private:
     std::array<NodeParams, kNumNodes> nodes;
 
     factory_core::ResonanceSuppressor suppressor;
-    double currentSampleRate = 44100.0;
-    std::array<double, kNumBins> profileBuf {};
+    double currentSampleRate = kRefSampleRate;
+    int    currentFftOrder   = kBaseFftOrder;
+    int    activeBins        = (1 << kBaseFftOrder) / 2 + 1;
+    std::array<double, kMaxBins> profileBuf {};
+    std::array<double, kMaxBins> magScratch {};
 
-    std::array<std::atomic<float>, kNumBins> pubMag {};
-    std::array<std::atomic<float>, kNumBins> pubRed {};
+    std::array<std::atomic<float>, kMaxBins> pubMag {};
+    std::array<std::atomic<float>, kMaxBins> pubRed {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ResonanceSuppressorAudioProcessor)
 };
