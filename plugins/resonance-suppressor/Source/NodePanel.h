@@ -38,8 +38,8 @@ public:
 
     int  currentNode()    const noexcept { return nodeId; }
     bool isCutNode()      const noexcept { return isCut; }
-    int  preferredWidth() const noexcept { return isCut ? 300 : 384; }
-    static constexpr int kHeight = 96;
+    int  preferredWidth() const noexcept { return isCut ? 290 : 360; }
+    static constexpr int kHeight = 104;
 
     // Rebind to node `id` (0 = low cut, 1 = high cut, 2.. = band). Drops the old
     // attachments first so syncing the new ones can't write back to the old node.
@@ -80,6 +80,7 @@ public:
             }
             return juce::String (juce::roundToInt (v)) + " Hz";
         };
+        freqSlider.setTextValueSuffix ({}); // the lambda already prints Hz/kHz — avoid a doubled suffix
         freqSlider.updateText();
         if (! isCut) factory_ui::setSliderDecimals (sensSlider, 1);
 
@@ -104,7 +105,7 @@ public:
         r.removeFromTop (2);
 
         // Bigger Freq/Sens knobs (~80% of the Depth knob) — centre the row.
-        constexpr int on = 54, combo = 118, knobW = 62, gap = 10;
+        constexpr int on = 54, combo = 72, knobW = 64, gap = 10;
         const int total = on + gap + combo + gap + knobW + (isCut ? 0 : gap + knobW);
         r.removeFromLeft (juce::jmax (0, (r.getWidth() - total) / 2));
 

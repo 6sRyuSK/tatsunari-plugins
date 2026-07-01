@@ -42,7 +42,7 @@ ResonanceSuppressorAudioProcessorEditor::ResonanceSuppressorAudioProcessorEditor
     setResizeLimits (640, 440, 1280, 900);
     if (auto* c = getConstrainer())
         c->setFixedAspectRatio (760.0 / 520.0);
-    setSize (760, 520);
+    setSize (912, 624); // default 20% larger than the 760x520 reference (same aspect)
 }
 
 ResonanceSuppressorAudioProcessorEditor::~ResonanceSuppressorAudioProcessorEditor()
