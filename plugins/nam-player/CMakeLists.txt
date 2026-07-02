@@ -16,7 +16,7 @@ include(NamCore)   # defines the nam_core OBJECT library (FetchContent NAM + Eig
 juce_add_plugin(NamPlayer
   VERSION                     ${NAMP_VERSION}
   PRODUCT_NAME                "NAM Player"
-  COMPANY_NAME                "Tatsunari"
+  COMPANY_NAME                "Tatsunari Sounds"
   PLUGIN_MANUFACTURER_CODE    Ttsn
   PLUGIN_CODE                 Nam1
   FORMATS                     ${NAMP_FORMATS}

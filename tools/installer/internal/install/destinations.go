@@ -8,13 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // Destination returns the directory a bundle of (format) is installed into for
 // the given os/scope. Bundles (".vst3"/".component") are placed directly under
 // this directory. The Windows system path mirrors the existing tools/install.ps1
-// convention of a "tatsunari" subfolder.
+// convention of a "tatsunari-sounds" subfolder.
 //
 // Env-based Windows roots fall back to conventional literals when the variable
 // is absent (e.g. computing a Windows plan while dry-running on another OS).
@@ -27,7 +27,7 @@ func Destination(osID model.OS, format model.Format, scope model.Scope) (string,
 		switch scope {
 		case model.ScopeSystem:
 			common := envOr("CommonProgramFiles", `C:\Program Files\Common Files`)
-			return filepath.Join(common, "VST3", "tatsunari"), nil
+			return filepath.Join(common, "VST3", "tatsunari-sounds"), nil
 		case model.ScopeUser:
 			local := envOr("LOCALAPPDATA", `%LOCALAPPDATA%`)
 			return filepath.Join(local, "Programs", "Common", "VST3"), nil

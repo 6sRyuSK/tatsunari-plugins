@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/install"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/install"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 // Selection captures a user's choices from the TUI (or headless flags).

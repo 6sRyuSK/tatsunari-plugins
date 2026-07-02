@@ -3,7 +3,7 @@ package install
 import (
 	"testing"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 func TestReceiptRoundTrip(t *testing.T) {

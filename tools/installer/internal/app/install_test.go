@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 // makeZipBytes builds an in-memory zip with a "<bundle>/..." bundle at the root.

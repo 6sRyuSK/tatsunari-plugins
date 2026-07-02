@@ -1,4 +1,4 @@
-# tatsunari-plugins TUI installer
+# tatsunari-sounds TUI installer
 
 A single-binary, cross-platform (macOS + Windows) terminal installer for the
 plugins published by this repo. Built with Go + [Charm](https://charm.sh)
@@ -22,11 +22,11 @@ plugins published by this repo. Built with Go + [Charm](https://charm.sh)
 
 macOS:
 
-    curl -fsSL https://raw.githubusercontent.com/6sRyuSK/tatsunari-plugins/main/tools/installer/bootstrap/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/6sRyuSK/tatsunari-sounds/main/tools/installer/bootstrap/install.sh | bash
 
 Windows (PowerShell):
 
-    irm https://raw.githubusercontent.com/6sRyuSK/tatsunari-plugins/main/tools/installer/bootstrap/install.ps1 | iex
+    irm https://raw.githubusercontent.com/6sRyuSK/tatsunari-sounds/main/tools/installer/bootstrap/install.ps1 | iex
 
 ## Layout
 
@@ -96,8 +96,8 @@ with `CGO_ENABLED=0`, generates `catalog.json` via
    then system (exactly one auth dialog). Confirm the `.vst3` / `.component`
    land under `~/Library` or `/Library`, and the DAW rescans.
 3. Re-run → rows show **up to date**. Edit the receipt version down
-   (`~/Library/Application Support/tatsunari-plugins/receipt.json` /
-   `%APPDATA%\tatsunari-plugins\receipt.json`) → the row shows **↑ update** →
+   (`~/Library/Application Support/tatsunari-sounds/receipt.json` /
+   `%APPDATA%\tatsunari-sounds\receipt.json`) → the row shows **↑ update** →
    run → confirm the bundle is replaced.
 4. Confirm the `curl | bash` / `irm | iex` path accepts keyboard input (the TTY
    reattach in `tty_*.go`).

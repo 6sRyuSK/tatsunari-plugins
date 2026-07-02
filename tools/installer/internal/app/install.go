@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/elevate"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/install"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/elevate"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/install"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 // Install phases reported through ProgressFunc.

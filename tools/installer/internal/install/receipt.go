@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // receiptSchema versions the on-disk format so future changes can migrate.
@@ -33,18 +33,18 @@ type ReceiptItem struct {
 }
 
 // ConfigDir returns the per-user config directory for the installer,
-// creating nothing. Windows: %AppData%\tatsunari-plugins; macOS:
-// ~/Library/Application Support/tatsunari-plugins.
+// creating nothing. Windows: %AppData%\tatsunari-sounds; macOS:
+// ~/Library/Application Support/tatsunari-sounds.
 func ConfigDir() (string, error) {
 	if dir := os.Getenv("APPDATA"); dir != "" { // Windows
-		return filepath.Join(dir, "tatsunari-plugins"), nil
+		return filepath.Join(dir, "tatsunari-sounds"), nil
 	}
 	home, err := homeDir()
 	if err != nil {
 		return "", err
 	}
 	// macOS (and a sane default elsewhere).
-	return filepath.Join(home, "Library", "Application Support", "tatsunari-plugins"), nil
+	return filepath.Join(home, "Library", "Application Support", "tatsunari-sounds"), nil
 }
 
 // ReceiptPath is the receipt file location.

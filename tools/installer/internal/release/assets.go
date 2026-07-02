@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // pluginAssetRe parses a per-plugin zip name:
@@ -14,11 +14,11 @@ import (
 // The slug group is greedy but the trailing "-v\d+_\d+_\d+-<suffix>.zip" anchor
 // makes the split unambiguous even for hyphenated slugs like
 // "resonance-suppressor". The overall bundle assets
-// ("tatsunari-plugins-v..._...-*.zip") are excluded by name below.
+// ("tatsunari-sounds-v..._...-*.zip") are excluded by name below.
 var pluginAssetRe = regexp.MustCompile(`^(?P<slug>.+)-v(\d+)_(\d+)_(\d+)-(macOS-AU|macOS-VST3|Windows)\.zip$`)
 
 // bundlePrefix marks the "everything" bundle assets, which are not per-plugin.
-const bundlePrefix = "tatsunari-plugins-"
+const bundlePrefix = "tatsunari-sounds-"
 
 // PluginAssets is the per-plugin slice of a release: its version plus the
 // (os,format) -> asset map derived from the asset filenames.

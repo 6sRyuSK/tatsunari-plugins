@@ -289,8 +289,8 @@ jobs:
             ( cd stageAU   && unzip -q "$root/dist/${slug}-${vus}-macOS-AU.zip" )
             ( cd stageVST3 && unzip -q "$root/dist/${slug}-${vus}-macOS-VST3.zip" )
           done < <(jq -c '.[]' <<<"$PLUGINS")
-          ( cd stageAU   && zip -r -y -q "$root/dist/tatsunari-plugins-${tus}-macOS-AU.zip" . )
-          ( cd stageVST3 && zip -r -y -q "$root/dist/tatsunari-plugins-${tus}-macOS-VST3.zip" . )
+          ( cd stageAU   && zip -r -y -q "$root/dist/tatsunari-sounds-${tus}-macOS-AU.zip" . )
+          ( cd stageVST3 && zip -r -y -q "$root/dist/tatsunari-sounds-${tus}-macOS-VST3.zip" . )
           echo "----- dist (macOS) -----"; ls -la dist
 
       - name: Assemble bundle (Windows)
@@ -316,7 +316,7 @@ jobs:
             Copy-Item $src "dist/$zipname"
             Expand-Archive "dist/$zipname" -DestinationPath stageWin -Force
           }
-          Compress-Archive -Path "stageWin/*" -DestinationPath "dist/tatsunari-plugins-$tus-Windows.zip" -Force
+          Compress-Archive -Path "stageWin/*" -DestinationPath "dist/tatsunari-sounds-$tus-Windows.zip" -Force
           Get-ChildItem dist
 
       - name: Upload per-OS assets
@@ -425,7 +425,7 @@ jobs:
           L += ["", "### ダウンロード", "",
                 "| プラグイン | macOS (AU) | macOS (VST3) | Windows (VST3) |",
                 "|---|---|---|---|",
-                f"| **All Plugins ({len(plugins)})** | [AU]({base}/tatsunari-plugins-{tus}-macOS-AU.zip) | [VST3]({base}/tatsunari-plugins-{tus}-macOS-VST3.zip) | [VST3]({base}/tatsunari-plugins-{tus}-Windows.zip) |"]
+                f"| **All Plugins ({len(plugins)})** | [AU]({base}/tatsunari-sounds-{tus}-macOS-AU.zip) | [VST3]({base}/tatsunari-sounds-{tus}-macOS-VST3.zip) | [VST3]({base}/tatsunari-sounds-{tus}-Windows.zip) |"]
           for p in plugins:
               fv = vus(p['version'])
               L.append(f"| {p['name']} v{p['version']} | [AU]({base}/{p['slug']}-{fv}-macOS-AU.zip) | [VST3]({base}/{p['slug']}-{fv}-macOS-VST3.zip) | [VST3]({base}/{p['slug']}-{fv}-Windows.zip) |")

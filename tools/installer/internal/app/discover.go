@@ -5,7 +5,7 @@ package app
 import (
 	"context"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 // Discover fetches the latest release and everything derived from it, then

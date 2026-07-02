@@ -19,13 +19,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // DefaultOwner / DefaultRepo are the repository this installer ships for.
 const (
 	DefaultOwner = "6sRyuSK"
-	DefaultRepo  = "tatsunari-plugins"
+	DefaultRepo  = "tatsunari-sounds"
 )
 
 // releaseTagRe matches a consolidated-release tag like "2026.2" (year.n), so we

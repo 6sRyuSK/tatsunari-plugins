@@ -12,7 +12,7 @@ endif()
 juce_add_plugin(ResonanceSuppressor
   VERSION                     ${RS_VERSION}
   PRODUCT_NAME                "Resonance Suppressor"
-  COMPANY_NAME                "Tatsunari"
+  COMPANY_NAME                "Tatsunari Sounds"
   PLUGIN_MANUFACTURER_CODE    Ttsn
   PLUGIN_CODE                 Rsup
   FORMATS                     ${RS_FORMATS}

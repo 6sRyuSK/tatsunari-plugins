@@ -5,10 +5,10 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/app"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/install"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/app"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/install"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 // discoveredMsg carries the result of release discovery.

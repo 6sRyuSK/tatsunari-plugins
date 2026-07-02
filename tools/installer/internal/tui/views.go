@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // View renders the current screen.
@@ -35,7 +35,7 @@ func (m Model) View() string {
 }
 
 func (m Model) header() string {
-	title := m.st.Title.Render("tatsunari-plugins " + m.tr.T("インストーラー", "installer"))
+	title := m.st.Title.Render("tatsunari-sounds " + m.tr.T("インストーラー", "installer"))
 	sub := ""
 	if m.cat.Tag != "" {
 		sub = m.st.Subtitle.Render(m.tr.T("リリース ", "release ") + m.cat.Tag + "  ·  " + string(m.targetOS))

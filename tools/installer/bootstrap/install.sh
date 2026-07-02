@@ -1,14 +1,14 @@
 #!/bin/sh
-# tatsunari-plugins installer bootstrap (macOS).
+# tatsunari-sounds installer bootstrap (macOS).
 #
-#   curl -fsSL https://raw.githubusercontent.com/6sRyuSK/tatsunari-plugins/main/tools/installer/bootstrap/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/6sRyuSK/tatsunari-sounds/main/tools/installer/bootstrap/install.sh | bash
 #
 # Detects OS/arch, downloads the matching installer binary from the latest
 # release, and launches the TUI with the terminal reattached (so it works under
 # a curl pipe).
 set -eu
 
-REPO="6sRyuSK/tatsunari-plugins"
+REPO="6sRyuSK/tatsunari-sounds"
 
 os="$(uname -s)"
 case "$os" in
@@ -33,7 +33,7 @@ esac
 asset="tatsunari-${goos}-${goarch}"
 api="https://api.github.com/repos/${REPO}/releases/latest"
 
-echo "Finding the latest tatsunari-plugins release…" >&2
+echo "Finding the latest tatsunari-sounds release…" >&2
 url="$(curl -fsSL "$api" | grep -o "https://[^\"[:space:]]*/${asset}" | head -n1)"
 if [ -z "${url:-}" ]; then
   echo "Could not find asset '${asset}' in the latest release." >&2

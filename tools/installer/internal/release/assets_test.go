@@ -3,7 +3,7 @@ package release
 import (
 	"testing"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 func mkRelease(names ...string) *Release {
@@ -22,8 +22,8 @@ func TestParsePluginAssets(t *testing.T) {
 		"nam-player-v0_1_0-macOS-VST3.zip",
 		"nam-player-v0_1_0-Windows.zip",
 		// noise that must be ignored:
-		"tatsunari-plugins-v2026_2-macOS-AU.zip",
-		"tatsunari-plugins-v2026_2-Windows.zip",
+		"tatsunari-sounds-v2026_2-macOS-AU.zip",
+		"tatsunari-sounds-v2026_2-Windows.zip",
 		"manifest.json",
 		"catalog.json",
 		"SHA256SUMS.txt",

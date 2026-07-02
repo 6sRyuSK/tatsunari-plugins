@@ -7,8 +7,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/tui"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/tui"
 )
 
 // runTUI launches the interactive Bubble Tea installer.
