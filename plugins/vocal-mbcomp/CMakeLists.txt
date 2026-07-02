@@ -11,7 +11,7 @@ endif()
 juce_add_plugin(VocalMbComp
   VERSION                     ${VMB_VERSION}
   PRODUCT_NAME                "Vocal MB Comp"
-  COMPANY_NAME                "Tatsunari"
+  COMPANY_NAME                "Tatsunari Sounds"
   PLUGIN_MANUFACTURER_CODE    Ttsn
   PLUGIN_CODE                 Vmbc
   FORMATS                     ${VMB_FORMATS}

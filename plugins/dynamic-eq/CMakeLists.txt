@@ -11,7 +11,7 @@ endif()
 juce_add_plugin(DynamicEq
   VERSION                     ${DEQ_VERSION}
   PRODUCT_NAME                "Dynamic Parametric EQ"
-  COMPANY_NAME                "Tatsunari"
+  COMPANY_NAME                "Tatsunari Sounds"
   PLUGIN_MANUFACTURER_CODE    Ttsn
   PLUGIN_CODE                 Dyeq
   FORMATS                     ${DEQ_FORMATS}

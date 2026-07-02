@@ -1,18 +1,18 @@
-# tatsunari-plugins installer bootstrap (Windows).
+# tatsunari-sounds installer bootstrap (Windows).
 #
-#   irm https://raw.githubusercontent.com/6sRyuSK/tatsunari-plugins/main/tools/installer/bootstrap/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/6sRyuSK/tatsunari-sounds/main/tools/installer/bootstrap/install.ps1 | iex
 #
 # Downloads the matching installer binary from the latest release and launches
 # the TUI. The installer runs unelevated; it asks the OS for a UAC prompt only
 # when you choose a system-wide install.
 $ErrorActionPreference = 'Stop'
 
-$repo = '6sRyuSK/tatsunari-plugins'
+$repo = '6sRyuSK/tatsunari-sounds'
 
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'amd64' }
 $asset = "tatsunari-windows-$arch.exe"
 
-Write-Host "Finding the latest tatsunari-plugins release..."
+Write-Host "Finding the latest tatsunari-sounds release..."
 $rel = Invoke-RestMethod -UseBasicParsing "https://api.github.com/repos/$repo/releases/latest"
 $dl = ($rel.assets | Where-Object { $_.name -eq $asset }).browser_download_url
 if (-not $dl) {

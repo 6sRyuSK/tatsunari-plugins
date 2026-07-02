@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // ApplyPlan executes an InstallPlan: it copies each staged bundle to its

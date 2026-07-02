@@ -13,7 +13,7 @@ endif()
 juce_add_plugin(SingleBandEQ
   VERSION                     ${SBEQ_VERSION}
   PRODUCT_NAME                "Single-Band EQ"
-  COMPANY_NAME                "Tatsunari"
+  COMPANY_NAME                "Tatsunari Sounds"
   PLUGIN_MANUFACTURER_CODE    Ttsn
   PLUGIN_CODE                 Sbeq
   FORMATS                     ${SBEQ_FORMATS}

@@ -26,7 +26,7 @@ func TestFetchLatestRelease(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewClient("6sRyuSK", "tatsunari-plugins", "")
+	c := NewClient("6sRyuSK", "tatsunari-sounds", "")
 	c.HTTP = srv.Client()
 	c.BaseURL = srv.URL
 

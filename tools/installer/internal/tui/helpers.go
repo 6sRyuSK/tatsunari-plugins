@@ -4,7 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // keyMatches reports whether a key press matches a binding.

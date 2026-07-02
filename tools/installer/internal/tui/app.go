@@ -9,10 +9,10 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/app"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/i18n"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/app"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/i18n"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 type screen int

@@ -38,9 +38,9 @@ def rewrite(region: str, tag: str) -> str:
     # URL path tag: .../releases/download/<year>.<n>/
     region = re.sub(r"releases/download/[0-9]{4}\.[0-9]+/",
                     f"releases/download/{tag}/", region)
-    # asset filename token: tatsunari-plugins-v<year>_<n>-<os>.zip
-    region = re.sub(r"tatsunari-plugins-v[0-9]{4}_[0-9]+-",
-                    f"tatsunari-plugins-{t}-", region)
+    # asset filename token: tatsunari-sounds-v<year>_<n>-<os>.zip
+    region = re.sub(r"tatsunari-sounds-v[0-9]{4}_[0-9]+-",
+                    f"tatsunari-sounds-{t}-", region)
     # inline `2026.1` / `v2026_1` references in the prose
     region = re.sub(r"`[0-9]{4}\.[0-9]+`", f"`{tag}`", region)
     region = re.sub(r"`v[0-9]{4}_[0-9]+`", f"`{t}`", region)

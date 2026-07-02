@@ -1,4 +1,4 @@
-module github.com/6sRyuSK/tatsunari-plugins/tools/installer
+module github.com/6sRyuSK/tatsunari-sounds/tools/installer
 
 go 1.24.2
 

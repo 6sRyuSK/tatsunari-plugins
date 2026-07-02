@@ -1,5 +1,5 @@
 // Command tatsunari-installer is a cross-platform TUI installer for the
-// tatsunari-plugins audio plugins. Run with no arguments it launches the TUI;
+// tatsunari-sounds audio plugins. Run with no arguments it launches the TUI;
 // --no-tui drives it headlessly (used for CI smoke and scripting); the hidden
 // __apply subcommand is the privileged file-mover invoked under OS elevation.
 package main
@@ -12,10 +12,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/app"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/install"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/app"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/install"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=<tag>".
@@ -352,7 +352,7 @@ func splitCSV(s string) []string {
 }
 
 func printUsage(w *os.File) {
-	fmt.Fprintf(w, `tatsunari-installer %s — TUI installer for tatsunari-plugins
+	fmt.Fprintf(w, `tatsunari-installer %s — TUI installer for tatsunari-sounds
 
 Usage:
   tatsunari-installer                 launch the interactive TUI

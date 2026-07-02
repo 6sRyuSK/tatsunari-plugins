@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 func TestDestinationMacOS(t *testing.T) {
@@ -45,7 +45,7 @@ func TestDestinationWindows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(norm(sys), "Common Files/VST3/tatsunari") {
+	if !strings.HasSuffix(norm(sys), "Common Files/VST3/tatsunari-sounds") {
 		t.Errorf("windows system dest = %q", sys)
 	}
 	usr, err := Destination(model.OSWindows, model.FormatVST3, model.ScopeUser)

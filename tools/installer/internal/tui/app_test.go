@@ -5,8 +5,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/release"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/release"
 )
 
 func fakeCatalog() release.Catalog {

@@ -3,7 +3,7 @@ package release
 import (
 	"sort"
 
-	"github.com/6sRyuSK/tatsunari-plugins/tools/installer/internal/model"
+	"github.com/6sRyuSK/tatsunari-sounds/tools/installer/internal/model"
 )
 
 // Catalog is the discovery bundle: everything fetched about the latest release,

@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Install built VST3 plugins into the shared "tatsunari" VST3 folder.
+    Install built VST3 plugins into the shared "tatsunari-sounds" VST3 folder.
 
 .DESCRIPTION
     Copies every built *.vst3 bundle found under build/ into
-    "%CommonProgramFiles%\VST3\tatsunari\" (normally
-    C:\Program Files\Common Files\VST3\tatsunari\).
+    "%CommonProgramFiles%\VST3\tatsunari-sounds\" (normally
+    C:\Program Files\Common Files\VST3\tatsunari-sounds\).
 
     Writing to Program Files needs administrator rights, so the script
     self-elevates (UAC prompt) when not already running as admin.
@@ -37,7 +37,7 @@ $ErrorActionPreference = "Stop"
 # Repo root: this script lives in <root>/tools.
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $BuildDir = Join-Path $RepoRoot "build"
-$Dest     = Join-Path ([Environment]::GetFolderPath("CommonProgramFiles")) "VST3\tatsunari"
+$Dest     = Join-Path ([Environment]::GetFolderPath("CommonProgramFiles")) "VST3\tatsunari-sounds"
 
 # --- Self-elevate: Program Files requires administrator rights -------------
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(

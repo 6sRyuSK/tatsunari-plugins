@@ -169,7 +169,7 @@ a narrower sample-rate set). The non-negotiables:
   the previous release (compared against that release's `manifest.json`);
   unchanged plugins are **carried over** from the previous release's assets
   verbatim (no rebuild). Bump `version` to ship a plugin — that is the trigger.
-- Assets: a per-OS everything bundle (`tatsunari-plugins-<tag>-macOS.zip` /
+- Assets: a per-OS everything bundle (`tatsunari-sounds-<tag>-macOS.zip` /
   `-Windows.zip`), a per-plugin zip each (`<slug>-<version>-<os>.zip`),
   `manifest.json`, and `SHA256SUMS.txt`. The release notes list per-plugin
   version transitions.
