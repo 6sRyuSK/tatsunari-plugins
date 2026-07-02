@@ -149,31 +149,14 @@ void NamPlayerAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
     currentSampleRate = sampleRate;
     currentBlock      = juce::jmax (1, samplesPerBlock);
 
-    resampling = std::abs (sampleRate - kNamRate) > 1.0e-6;
+    // The host<->48k resampling bracket owns its FIFO, latency and prefill; the
+    // NAM section runs at 48 kHz when resampling, otherwise at the host rate.
+    bracket.prepare (sampleRate, kNamRate, currentBlock);
+    resampling      = bracket.active();
+    reportedLatency = bracket.latencySamples();
+    namMaxBlk       = bracket.modelBlockCapacity();
 
-    if (resampling)
-    {
-        // NAM section runs at 48 kHz; size its block for the worst-case ratio.
-        namMaxBlk       = (int) std::ceil (currentBlock * kNamRate / sampleRate) + 4;
-        reportedLatency = factory_core::resamplerRoundTripLatency (sampleRate, kNamRate, 2) + 16;
-        engine.prepare (kNamRate, namMaxBlk);
-        for (int ch = 0; ch < 2; ++ch)
-        {
-            downSamp[(size_t) ch].prepare (sampleRate, kNamRate);
-            upSamp[(size_t) ch].prepare (kNamRate, sampleRate);
-            namBuf[(size_t) ch].assign    ((size_t) namMaxBlk, 0.0f);
-            upScratch[(size_t) ch].assign ((size_t) (currentBlock + 8), 0.0f);
-            outFifo[(size_t) ch].prepare (currentBlock * 4 + 64);
-            outFifo[(size_t) ch].reset();
-            outFifo[(size_t) ch].pushZeros (reportedLatency);   // wet delayed by exactly reportedLatency
-        }
-    }
-    else
-    {
-        namMaxBlk       = currentBlock;
-        reportedLatency = 0;
-        engine.prepare (sampleRate, currentBlock);
-    }
+    engine.prepare (resampling ? kNamRate : sampleRate, resampling ? namMaxBlk : currentBlock);
     engine.reset();
 
     for (auto& c : irConv) { c.prepare (currentBlock, kMaxIrSamples); c.reset(); }
@@ -275,27 +258,11 @@ void NamPlayerAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         engine.setSlot (k, en, md, ing, og, bal);
     }
 
-    // NAM section at 48 kHz, bracketed by resampling when the host rate differs.
-    if (resampling)
-    {
-        const int namN0 = downSamp[0].process (wL.data(), n, namBuf[0].data(), namMaxBlk);
-        const int namN1 = downSamp[1].process (wR.data(), n, namBuf[1].data(), namMaxBlk);
-        const int namN  = std::min (namN0, namN1);
-        engine.process (namBuf[0].data(), namBuf[1].data(), namBuf[0].data(), namBuf[1].data(), namN);
-        for (int ch = 0; ch < 2; ++ch)
-        {
-            const int hostM = upSamp[(size_t) ch].process (namBuf[(size_t) ch].data(), namN,
-                                                           upScratch[(size_t) ch].data(),
-                                                           (int) upScratch[(size_t) ch].size());
-            outFifo[(size_t) ch].push (upScratch[(size_t) ch].data(), hostM);
-        }
-        outFifo[0].pull (wL.data(), n);
-        outFifo[1].pull (wR.data(), n);
-    }
-    else
-    {
-        engine.process (wL.data(), wR.data(), wL.data(), wR.data(), n);
-    }
+    // NAM section: the RateBracket resamples host<->48k around it (or runs it at the
+    // host rate when they match) and delivers exactly n aligned host samples.
+    bracket.process (wL.data(), wR.data(), wL.data(), wR.data(), n,
+                     [this] (float* l, float* r, int m) noexcept
+                     { engine.process (l, r, l, r, m); });
 
     // Cabinet IR (zero latency). IR level only applies when a kernel is loaded.
     if (irEnableParam->load() > 0.5f

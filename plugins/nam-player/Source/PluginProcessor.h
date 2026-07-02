@@ -5,6 +5,7 @@
 #include "factory_core/NamRoutingEngine.h"
 #include "factory_core/FftConvolver.h"
 #include "factory_core/Resampler.h"
+#include "factory_core/RateBracket.h"
 #include "factory_core/ResamplerLatency.h"
 #include "factory_core/DelayLine.h"
 #include "factory_core/Biquad.h"
@@ -86,32 +87,6 @@ public:
     static juce::String slotPid (int slot, const char* suffix);
 
 private:
-    // Fixed-capacity SPSC-free ring used on the audio thread to buffer resampled
-    // output so exactly `blockSize` host samples can be delivered each callback.
-    struct HostFifo
-    {
-        std::vector<float> buf;
-        int mask = 0, rd = 0, wr = 0, count = 0;
-        void prepare (int minSize)
-        {
-            int p = 1; while (p < minSize) p <<= 1;
-            buf.assign ((size_t) p, 0.0f); mask = p - 1; rd = wr = count = 0;
-        }
-        void reset() { std::fill (buf.begin(), buf.end(), 0.0f); rd = wr = count = 0; }
-        void pushZeros (int m) noexcept
-        {
-            for (int i = 0; i < m; ++i) { buf[(size_t) wr] = 0.0f; wr = (wr + 1) & mask; if (count <= mask) ++count; else rd = (rd + 1) & mask; }
-        }
-        void push (const float* x, int m) noexcept
-        {
-            for (int i = 0; i < m; ++i) { buf[(size_t) wr] = x[i]; wr = (wr + 1) & mask; if (count <= mask) ++count; else rd = (rd + 1) & mask; }
-        }
-        void pull (float* out, int n) noexcept
-        {
-            for (int i = 0; i < n; ++i) { if (count > 0) { out[i] = buf[(size_t) rd]; rd = (rd + 1) & mask; --count; } else out[i] = 0.0f; }
-        }
-    };
-
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     void timerCallback() override;
@@ -150,12 +125,12 @@ private:
     bool   irLoaded  = false;
 
     // Resampling around the 48 kHz NAM section (bypassed when host == 48 kHz).
+    // The whole host<->48k bracket + output FIFO + latency reporting lives in the
+    // headless factory_core::RateBracket so the wet/dry alignment is unit-testable.
     bool  resampling = false;
     int   reportedLatency = 0;
     int   namMaxBlk = 0;
-    std::array<factory_core::Resampler, 2> downSamp, upSamp;
-    std::array<std::vector<float>, 2>      namBuf, upScratch;
-    std::array<HostFifo, 2>                outFifo;
+    factory_core::RateBracket<>            bracket;
     std::array<factory_core::DelayLine, 2> dryDelay;
 
     juce::SmoothedValue<float> inTrimSm, outGainSm, mixSm;

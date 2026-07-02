@@ -12,6 +12,9 @@
 #include "factory_core/FftConvolver.h"
 #include "factory_core/Resampler.h"
 #include "factory_core/ResamplerLatency.h"
+#include "factory_core/RateBracket.h"
+#include "factory_core/Biquad.h"
+#include "factory_core/Filters.h"
 #include "factory_core/testing/DspInvariants.h"
 
 #include <array>
@@ -418,6 +421,87 @@ namespace
             prev = l;
         }
     }
+
+    // ---- RateBracket end-to-end wet/dry alignment (the real production path) ------
+    //
+    // RateBracket is the exact code the plugin runs (host<->48k resampling bracket +
+    // output FIFO), so testing it headless tests the production alignment, not a
+    // re-implementation. With an identity section the wet output must lag the input
+    // by EXACTLY latencySamples() — the integer that the dry path is delayed by —
+    // with high correlation (no FIFO underrun / zero-insertion). This fails against
+    // the 0.1.0 double-counted prefill (wet lagged the report by the round-trip g).
+    void rateBracketTests (double fs)
+    {
+        std::printf ("RateBracket E2E @ Fs=%.0f\n", fs);
+        std::mt19937 rng (0x0B1A5u ^ (unsigned) (long long) fs);
+
+        for (int blk : { 64, 480, 512, 2048 })   // 480 is a deliberate non-power-of-two
+        {
+            factory_core::RateBracket<> br;
+            br.prepare (fs, 48000.0, blk);
+            const int lat = br.latencySamples();
+
+            // Band-limited input at the host rate: white noise through a 3-pole
+            // low-pass well inside the resampler passband so the identity round-trip
+            // stays > 0.99 correlated, with a single sharp autocorrelation peak.
+            const int total = blk * 300;
+            std::vector<float> in ((size_t) total);
+            {
+                std::uniform_real_distribution<float> d (-1.0f, 1.0f);
+                for (int i = 0; i < total; ++i) in[(size_t) i] = d (rng);
+                const double fc = 0.10 * std::min (fs, 48000.0);
+                const auto c = factory_core::designFilter (factory_core::BandType::LowPass, fc, 0.0, 0.70710678, fs);
+                factory_core::Biquad lp[3];
+                for (auto& b : lp) { b.setCoeffs (c); b.process (in.data(), total); }
+                double pk = 0.0; for (float v : in) pk = std::max (pk, (double) std::abs (v));
+                if (pk > 0.0) for (auto& v : in) v = (float) (v / pk * 0.7);
+            }
+
+            std::vector<float> out ((size_t) total, 0.0f);
+            std::vector<float> ob0 ((size_t) blk), ob1 ((size_t) blk);
+            for (int p = 0; p < total; p += blk)
+            {
+                const int m = std::min (blk, total - p);
+                br.process (in.data() + p, in.data() + p, ob0.data(), ob1.data(), m,
+                            [] (float*, float*, int) noexcept { /* identity section */ });
+                for (int i = 0; i < m; ++i) out[(size_t) (p + i)] = ob0[(size_t) i];
+            }
+
+            if (fs == 48000.0)   // resampler bypassed: zero latency, bit-exact passthrough
+            {
+                check (lat == 0, "RateBracket latency at model rate != 0 (blk=" + std::to_string (blk) + ")");
+                check (maxAbsDiff (out, in) == 0.0, "RateBracket 48k not bit-exact passthrough (blk=" + std::to_string (blk) + ")");
+                continue;
+            }
+
+            // Find the integer lag maximizing normalized cross-correlation of out vs in,
+            // over a steady-state window. Search a range covering every rate's latency
+            // AND the buggy (round-trip-shifted) value, so the alignment fix is gated.
+            const int W = std::min (8192, total / 4);
+            const int s = total / 2;
+            double outEnergy = 0.0;
+            for (int i = 0; i < W; ++i) { const double o = out[(size_t) (s + i)]; outEnergy += o * o; }
+            int    bestLag  = -1;
+            double bestCorr = -1.0;
+            for (int L = 0; L <= 300; ++L)
+            {
+                double cc = 0.0, ie = 0.0;
+                for (int i = 0; i < W; ++i)
+                {
+                    const double o = out[(size_t) (s + i)];
+                    const double x = in[(size_t) (s + i - L)];
+                    cc += o * x; ie += x * x;
+                }
+                const double corr = cc / std::sqrt (std::max (1e-300, outEnergy * ie));
+                if (corr > bestCorr) { bestCorr = corr; bestLag = L; }
+            }
+            check (bestLag == lat, "RateBracket wet lag " + std::to_string (bestLag)
+                   + " != reported latency " + std::to_string (lat) + " (Fs=" + std::to_string ((int) fs)
+                   + ", blk=" + std::to_string (blk) + ")");
+            check (bestCorr > 0.99, "RateBracket wet/dry correlation too low: " + std::to_string (bestCorr)
+                   + " (Fs=" + std::to_string ((int) fs) + ", blk=" + std::to_string (blk) + ")");
+        }
+    }
 }
 
 int main (int argc, char** argv)
@@ -428,7 +512,10 @@ int main (int argc, char** argv)
 
     const auto rates = factory_core::testing::sampleRatesFromArgs (argc, argv);
     for (double fs : rates)
+    {
         routingTests (fs);
+        rateBracketTests (fs);
+    }
 
     if (g_failures == 0) { std::printf ("OK: all checks passed.\n"); return 0; }
     std::printf ("FAILED: %d check(s).\n", g_failures);
